@@ -3,14 +3,16 @@ import math
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 from rdkit.Chem import Draw
+from rdkit.Chem import AllChem
 import sys
 sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
+sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/catalystGA")
 from catalystGA import GA
 from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
+from xtb import xtb_calculate
 
-
-class OrganicCatalyst:
+class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
 
     def __init__(self, mol: Chem.Mol) -> None:
@@ -20,7 +22,10 @@ class OrganicCatalyst:
         self.timing = math.nan
         self.error = ""
         self.idx = (-1, -1)
-
+        self.amine_type = tuple(True if mol.HasSubstructMatch(Chem.MolFromSmarts(patt)) else False for patt in ["[D1;N]","[D2;N]","[D3;N]"])
+        self.dHabs = math.nan #Heat of absorbtion
+        self.kabs = math.nan #k of reaction limiting step. amine->bicarbonate for tertiary amines
+        # 
     @property
     def smiles(self) -> str:
         """Yields SMILES string of molecule, needed for Database.
@@ -28,7 +33,15 @@ class OrganicCatalyst:
         Returns:
             str: SMILES string
         """
-        return Chem.MolToSmiles(Chem.RemoveHs(self.mol))
+        return Chem.MolToSmiles(Chem.RemoveHs(self.mol))  
+
+    @staticmethod
+    def hartree_to_kcalmol(hartree):
+        return hartree * 627.503
+
+    @staticmethod
+    def hartree_to_ev(hartree):
+        return hartree * 27.2107
 
     def calculate_score(
         self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
@@ -42,6 +55,30 @@ class OrganicCatalyst:
         """
         # TODO: implement scoring function
         # this is just a placeholder
+
+        ##Check if in database, if yes -> return db values for that mol instead of computing
+
+        ##Reactant prepare:
+        options ={"gfn":2, "opt":True}
+
+        Chem.AddHs(self.mol)
+        _ = AllChem.rdDistGeom.EmbedMultipleConfs(
+                        self.mol,
+                        numConfs=100,
+                        useRandomCoords=True,
+                        pruneRmsThresh=0.1,
+                        #randomSeed=3,
+                    )
+        atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
+        rectant_confs = []
+        for conformer in self.mol.GetConformers():
+            coords = conformer.GetPostions()
+            opt_atoms, opt_coords, opt_energy = xtb_calculate(atoms=atoms, coords=coords, options=options
+    )
+            rectant_confs.append(opt_atoms, opt_coords, opt_energy)
+
+        reactant_energy = 0 
+        
         logP = Descriptors.MolLogP(self.mol)
         self.score = logP
 
@@ -66,11 +103,12 @@ class GraphGA(GA):
         )
 
     def make_initial_population(self):
-        with open("data/ligands.smi", "r") as f:
+        with open("data/amines.smi", "r") as f:
             lines = f.readlines()
         mols = [Chem.MolFromSmiles(line.strip()) for line in lines]
-        population = [OrganicCatalyst(mol) for mol in mols[: self.population_size]]
+        population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         return population
+
 
     def crossover(self, ind1, ind2):
         mol1 = ind1.mol
@@ -80,7 +118,7 @@ class GraphGA(GA):
             new_mol = graph_crossover(mol1, mol2)
         try:
             Chem.SanitizeMol(new_mol)
-            ind = OrganicCatalyst(new_mol)
+            ind = AmineCatalyst(new_mol)
             return ind
         except Exception:
             return None
@@ -92,7 +130,7 @@ class GraphGA(GA):
             new_mol = graph_mutate(mol)
         try:
             Chem.SanitizeMol(new_mol)
-            ind = OrganicCatalyst(new_mol)
+            ind = AmineCatalyst(new_mol)
             return ind
         except Exception:
             return None
@@ -109,7 +147,6 @@ class GraphGA(GA):
         
         self.print_population(self.population, 0)
         
-        """
         for n in range(0, self.n_generations):
             print("N-generation: ", n, "\n")
             self.calculate_fitness(self.population)
@@ -123,15 +160,43 @@ class GraphGA(GA):
         self.calculate_fitness(self.population)
         self.db.add_generation(n + 1, self.population)
         self.append_results(results, gennum=n + 1, detailed=True)
-        """
+        
         return results
 
-
 if __name__ == "__main__":
+    mol = Chem.MolFromSmiles("NCN")
+    patt = Chem.MolFromSmarts("[D1;N]")
+    matches = mol.GetSubstructMatches(patt)
+    for m in matches:
+        print(m)
+    ml = Chem.MolFromSmiles("C-C-C-C")
+    ml = Chem.AddHs(ml)
+    AllChem.EmbedMolecule(ml)
+    _ = Chem.rdDistGeom.EmbedMultipleConfs(
+                        ml,
+                        numConfs=100,
+                        useRandomCoords=True,
+                        pruneRmsThresh=0.1,
+                        randomSeed=3,
+                    )
+
+    atoms = [atom.GetSymbol() for atom in ml.GetAtoms()]
+    print(atoms)
+
+    options = {"gfn": 2,"opt":True }
+    for conf in ml.GetConformers():
+        cid = conf.GetId()
+        coords = conf.GetPositions()
+    
+        opt_atoms, opt_coords, opt_energy = xtb_calculate(atoms=atoms, coords=coords, options=options
+        )
+    print(cid, opt_atoms, coords-opt_coords, opt_energy)
+
+    """
     import matplotlib.pyplot as plt
 
     ga = GraphGA(
-        mol_options=MoleculeOptions(OrganicCatalyst),
+        mol_options=MoleculeOptions(AmineCatalyst),
         population_size=10,
         n_generations=15,
         mutation_rate=0.5,
@@ -150,3 +215,4 @@ if __name__ == "__main__":
     ax.set_ylabel("Max Score")
 
     plt.savefig("organic.png")
+    """

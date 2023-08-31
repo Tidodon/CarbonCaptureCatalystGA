@@ -108,14 +108,7 @@ class GraphGA(GA):
         self.db.add_individuals(0, self.population)
         
         self.print_population(self.population, 0)
-        inda, indb = 2,5
-        a = self.population[inda].mol#Chem.MolToSmiles(self.population[0].mol)
-        b = self.population[indb].mol#Chem.MolToSmiles(self.population[1].mol)
-        ab = self.crossover(self.population[inda], self.population[indb]).mol#Chem.MolToSmiles(self.crossover(self.population[0], self.population[1]).mol)
-        #print(a)
-        Draw.MolToFile(a, "a.png")
-        Draw.MolToFile(b, "b.png")
-        Draw.MolToFile(ab, "ab.png")
+        
         """
         for n in range(0, self.n_generations):
             print("N-generation: ", n, "\n")
