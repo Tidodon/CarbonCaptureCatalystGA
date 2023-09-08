@@ -29,7 +29,7 @@ class OrganicCatalyst:
             str: SMILES string
         """
         return Chem.MolToSmiles(Chem.RemoveHs(self.mol))
-
+        
     def calculate_score(
         self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
     ):
@@ -109,7 +109,7 @@ class GraphGA(GA):
         
         self.print_population(self.population, 0)
         
-        """
+        
         for n in range(0, self.n_generations):
             print("N-generation: ", n, "\n")
             self.calculate_fitness(self.population)
@@ -123,9 +123,8 @@ class GraphGA(GA):
         self.calculate_fitness(self.population)
         self.db.add_generation(n + 1, self.population)
         self.append_results(results, gennum=n + 1, detailed=True)
-        """
+        
         return results
-
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

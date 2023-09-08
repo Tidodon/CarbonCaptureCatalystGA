@@ -12,8 +12,18 @@ from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
 from xtb import xtb_calculate
 
+
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
+
+    # Reactant energies given by GFN2 method with geom. opt.
+    CO2_energy = -10.308452272882 # E_h
+    H2O_energy = -5.0705442454 # E_h
+
+    #Temperature of the runs:
+    T_K = 313 #K
+    ### Boltzmann constant
+    K_B = 3.166811563 * pow(10,-6) # E_h/K
 
     def __init__(self, mol: Chem.Mol) -> None:
         self.mol = mol
@@ -36,12 +46,43 @@ class AmineCatalyst:
         return Chem.MolToSmiles(Chem.RemoveHs(self.mol))  
 
     @staticmethod
-    def hartree_to_kcalmol(hartree):
-        return hartree * 627.503
+    def hartree_to_kcalmol(hartree) -> float:
+        ### Conversion value take from wiki
+        return hartree * 627.509474063
 
     @staticmethod
-    def hartree_to_ev(hartree):
-        return hartree * 27.2107
+    def hartree_to_ev(hartree) -> float:
+        ### Conversion value take from wiki
+        return hartree * 27.211386245988 
+    
+    def calculate_energy(self, n_cores, xtb_options={"gfn":2, "opt":True}):
+        ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
+        # The energy is weighted by the contribution of individual conformers.
+        self.mol = Chem.AddHs(self.mol)
+        _ = Chem.rdDistGeom.EmbedMultipleConfs(
+                        self.mol,
+                        numConfs=100,
+                        useRandomCoords=True,
+                        pruneRmsThresh=0.1,
+                        randomSeed=3
+                    )
+        atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
+        confs = []
+        for conformer in self.mol.GetConformers():
+            coords = conformer.GetPositions()
+            opt_atoms, opt_coords, opt_energy = xtb_calculate(atoms=atoms, coords=coords, options=xtb_options, n_cores=n_cores
+    )
+            confs.append([opt_atoms, opt_coords, opt_energy])
+        return confs
+    
+    def weight_energy(self, confs):
+        mv = min([v[2] for v in confs])
+        boltz_exponents = [(val[2]-mv)/(self.K_B * self.T_K) for val in confs ]
+        boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
+        return sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
+        
+
+    
 
     def calculate_score(
         self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
@@ -59,28 +100,37 @@ class AmineCatalyst:
         ##Check if in database, if yes -> return db values for that mol instead of computing
 
         ##Reactant prepare:
-        options ={"gfn":2, "opt":True}
-
-        Chem.AddHs(self.mol)
-        _ = AllChem.rdDistGeom.EmbedMultipleConfs(
-                        self.mol,
-                        numConfs=100,
-                        useRandomCoords=True,
-                        pruneRmsThresh=0.1,
-                        #randomSeed=3,
-                    )
-        atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
-        rectant_confs = []
-        for conformer in self.mol.GetConformers():
-            coords = conformer.GetPostions()
-            opt_atoms, opt_coords, opt_energy = xtb_calculate(atoms=atoms, coords=coords, options=options
-    )
-            rectant_confs.append(opt_atoms, opt_coords, opt_energy)
-
-        reactant_energy = 0 
+        reactant_confs = self.calculate_energy(n_cores=n_cores, )
+        reactant_energy = self.H2O_energy + self.CO2_energy + self.weight_energy(reactant_confs)
         
-        logP = Descriptors.MolLogP(self.mol)
-        self.score = logP
+        product_energy = 0 # Compute for each possible product OR weight them by boltzmann
+
+        ### Decide on which product to use by k value:
+
+        prim_amines = []
+        seco_amines = []
+        tert_amines = []
+        """
+        if self.amine_type[0]:
+            patt_prim = Chem.MolFromSmarts("[D1;N]")
+            repl_prim = Chem.MolFromSmarts("[N+]")
+            outs = Chem.rdmolops.ReplaceSubstructs(mol=m, query=patt_prim, replacement=repl_prim)
+            for struct in outs:
+                ###Compute k
+                ###Compute dH
+                prim_mol = Chem.MolFromSmiles(struct)
+                Chem.AddHs(tmol2)
+                AllChem.EmbedMolecule(m2)
+                AllChem.MMFFOptimizeMolecule(m2)
+                AllChem.Compute2DCoords(tmol2)
+                Chem.MolToMolBlock(tmol2)
+        """
+        self.score = reactant_energy
+
+
+
+        #logP = Descriptors.MolLogP(self.mol)
+        #self.score = logP
 
 
 class GraphGA(GA):
@@ -105,7 +155,7 @@ class GraphGA(GA):
     def make_initial_population(self):
         with open("data/amines.smi", "r") as f:
             lines = f.readlines()
-        mols = [Chem.MolFromSmiles(line.strip()) for line in lines]
+        mols = [Chem.MolFromSmiles(line.strip(","))[0] for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         return population
 
@@ -164,41 +214,35 @@ class GraphGA(GA):
         return results
 
 if __name__ == "__main__":
-    mol = Chem.MolFromSmiles("NCN")
-    patt = Chem.MolFromSmarts("[D1;N]")
-    matches = mol.GetSubstructMatches(patt)
-    for m in matches:
-        print(m)
-    ml = Chem.MolFromSmiles("C-C-C-C")
-    ml = Chem.AddHs(ml)
-    AllChem.EmbedMolecule(ml)
-    _ = Chem.rdDistGeom.EmbedMultipleConfs(
-                        ml,
-                        numConfs=100,
-                        useRandomCoords=True,
-                        pruneRmsThresh=0.1,
-                        randomSeed=3,
-                    )
+    m = Chem.MolFromSmiles("CCCC")
+    A_cat = AmineCatalyst(m)
+    A_cat.calculate_score()
+    print("Scoring value: ", A_cat.score)
 
-    atoms = [atom.GetSymbol() for atom in ml.GetAtoms()]
-    print(atoms)
+    m = Chem.AddHs(m)
 
-    options = {"gfn": 2,"opt":True }
-    for conf in ml.GetConformers():
-        cid = conf.GetId()
-        coords = conf.GetPositions()
-    
-        opt_atoms, opt_coords, opt_energy = xtb_calculate(atoms=atoms, coords=coords, options=options
-        )
-    print(cid, opt_atoms, coords-opt_coords, opt_energy)
 
+
+   
+    """
+    print("Reactant conf:", reactant_confs)
+    print("KB T_K: ", reactant_confs[0][2]/(AmineCatalyst.K_B * AmineCatalyst.T_K))
+   
+    print("Boltzmanns: ", [conf_e[2] for conf_e in reactant_confs])
+    reactant_boltzmann_dists = [math.exp(conf_e[2]/(AmineCatalyst.K_B * AmineCatalyst.T_K))  for conf_e in reactant_confs]
+    print("reactant boltz dist:", reactant_boltzmann_dists)
+    norm_factor= sum(reactant_boltzmann_dists)
+    reactant_energy = AmineCatalyst.H2O_energy + AmineCatalyst.CO2_energy + sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(reactant_boltzmann_dists, reactant_confs)])/norm_factor
+    print("reactant energy: ", reactant_energy)
+    print(reactant_energy)
+    """
     """
     import matplotlib.pyplot as plt
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=10,
-        n_generations=15,
+        population_size=5,
+        n_generations=5,
         mutation_rate=0.5,
         db_location="organic.sqlite",
         scoring_kwargs={},
@@ -216,3 +260,4 @@ if __name__ == "__main__":
 
     plt.savefig("organic.png")
     """
+    
