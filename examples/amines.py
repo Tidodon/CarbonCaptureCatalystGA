@@ -41,10 +41,10 @@ class AmineCatalyst:
         self.timing = math.nan
         self.error = ""
         self.idx = (-1, -1)
-        self.amine_type = tuple(True if mol.HasSubstructMatch(Chem.MolFromSmarts(patt)) else False for patt in ["[D1;N]","[D2;N]","[D3;N]"])
+        self.amine_type = tuple(True if mol.HasSubstructMatch(Chem.MolFromSmarts(patt)) else False for patt in ["[D1;N]","[D2;N]","[D3;N]"])#Respectively primary/secondary/tertiary amine
         self.dHabs = math.nan #Heat of absorbtion
         self.kabs = math.nan #k of reaction limiting step. amine->bicarbonate for tertiary amines
-        # 
+        
     @property
     def smiles(self) -> str:
         """Yields SMILES string of molecule, needed for Database.
@@ -94,17 +94,24 @@ class AmineCatalyst:
 
         """
         A generator method that gives smiles representation 
-        # of the possible product molecules given pattern(patt
-        # and replacement(repl). It gives energy values for each 
-        # of the products.
+        of the possible product molecules given pattern(patt
+        and replacement(repl). It gives energy values for each 
+        of the products.
+
+        Arguments:
+        patt: recognization pattern given by a mol object
+        repl: replacement of the pattern, given by a mol object.
         """
 
         products = Chem.rdmolops.ReplaceSubstructs(mol=self.mol, query=patt, replacement=repl)
         for prod in products:
-            mol = Chem.AddHs(prod)
-            cat = AmineCatalyst(mol)
+            print("TT", Chem.MolToSmiles(prod))
+            prod = Chem.AddHs(prod)
+
+            cat = AmineCatalyst(prod)
+            print(cat.smiles)
             confs = cat.calculate_energy(n_cores=n_cores)
-            yield [cat.smiles ,cat.weight_energy(confs)]
+            yield cat.smiles ,cat.weight_energy(confs)
     
 
     def calculate_score(
@@ -124,7 +131,7 @@ class AmineCatalyst:
 
         ##Reactant prepare:
         reactant_confs = self.calculate_energy(n_cores=n_cores, )
-        reactant_energy = self.H2O_energy + self.CO2_energy + self.weight_energy(reactant_confs)
+        reactant_energy = self.weight_energy(reactant_confs)#self.H2O_energy + self.CO2_energy + self.weight_energy(reactant_confs)
         
         product_energy = 0 # Compute for each possible product OR weight them by boltzmann
 
@@ -133,9 +140,16 @@ class AmineCatalyst:
         pri_cats = [ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0], n_cores=n_cores) if self.amine_type[0]] ### List comprehension solution here?
         sec_cats = [ prod for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1], n_cores=n_cores) if self.amine_type[1]]
         ter_cats = [ prod for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2], n_cores=n_cores) if self.amine_type[2]]
+        amine_products_all = pri_cats + sec_cats + ter_cats
+        print(amine_products_all)
         
         ### Decide on which product to use by k value:
-        self.score = reactant_energy
+
+
+        #Assign score values based on dH, k, SA
+        print("RE: ", reactant_energy)
+        print("Amines: ", min([val[1] for val in amine_products_all]))
+        self.score = min([val[1] for val in amine_products_all]) - reactant_energy 
 
 
 
@@ -163,7 +177,7 @@ class GraphGA(GA):
         )
 
     def make_initial_population(self):
-        with open("data/amines.smi", "r") as f:
+        with open("data/amines.data", "r") as f:
             lines = f.readlines()
         mols = [Chem.MolFromSmiles(line.strip(","))[0] for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
@@ -223,10 +237,20 @@ class GraphGA(GA):
         return results
 
 if __name__ == "__main__":
-    m = Chem.MolFromSmiles("CCCC")
-    A_cat = AmineCatalyst(m)
-    A_cat.calculate_score()
-    print("Scoring value: ", A_cat.score)
+    #import time
+    m = Chem.MolFromSmiles("NCCO")
+    test = AmineCatalyst(m)
+    test.calculate_score()
+    print("same?", test.score)
+    #A_cat = AmineCatalyst(m)
+    #start = time.time()
+    #A_cat.calculate_score()
+    #end = time.time()
+    #print("Duration: ", end-start)
+    #print("Scoring value: ", AmineCatalyst.hartree_to_kcalmol(A_cat.score))
+
+    #population = GA.make_initial_population()
+
 
 
 
