@@ -13,17 +13,26 @@ from catalystGA.utils import MoleculeOptions
 from xtb import xtb_calculate
 
 
+#### TODOS:
+#### - Remove hardcoded temperature
+#### - Intermediate naming for prim/seco/tert amines in the scoring function
+#### -
+
+
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
 
-    # Reactant energies given by GFN2 method with geom. opt.
-    CO2_energy = -10.308452272882 # E_h
-    H2O_energy = -5.0705442454 # E_h
+    # Reactant energies given by GFN2 method with geom. opt.& GBSA solvation
+    CO2_energy = -10.306805753197 # E_h
+    H2O_energy = -5.080122224999 # E_h
 
     #Temperature of the runs:
-    T_K = 313 #K
+    T_K = 313 # K
     ### Boltzmann constant
-    K_B = 3.166811563 * pow(10,-6) # E_h/K
+    K_B = 3.166811563 * math.pow(10,-6) # E_h/K
+
+    patts = [Chem.MolFromSmarts("[D1;N;H2]"),Chem.MolFromSmarts("[D2;N;H1]"),Chem.MolFromSmarts("[D3;N;H0]")]
+    repls =  [Chem.MolFromSmarts("[NH3+]"),Chem.MolFromSmarts("[NH2+]"),Chem.MolFromSmarts("[NH+]")]
 
     def __init__(self, mol: Chem.Mol) -> None:
         self.mol = mol
@@ -55,7 +64,7 @@ class AmineCatalyst:
         ### Conversion value take from wiki
         return hartree * 27.211386245988 
     
-    def calculate_energy(self, n_cores, xtb_options={"gfn":2, "opt":True}):
+    def calculate_energy(self, n_cores, xtb_options={"gfn":2, "opt":True, "gbsa": "water"}):
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
         self.mol = Chem.AddHs(self.mol)
@@ -81,7 +90,21 @@ class AmineCatalyst:
         boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
         return sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
         
+    def cat_products(self, patt, repl, n_cores):
 
+        """
+        A generator method that gives smiles representation 
+        # of the possible product molecules given pattern(patt
+        # and replacement(repl). It gives energy values for each 
+        # of the products.
+        """
+
+        products = Chem.rdmolops.ReplaceSubstructs(mol=self.mol, query=patt, replacement=repl)
+        for prod in products:
+            mol = Chem.AddHs(prod)
+            cat = AmineCatalyst(mol)
+            confs = cat.calculate_energy(n_cores=n_cores)
+            yield [cat.smiles ,cat.weight_energy(confs)]
     
 
     def calculate_score(
@@ -105,26 +128,13 @@ class AmineCatalyst:
         
         product_energy = 0 # Compute for each possible product OR weight them by boltzmann
 
-        ### Decide on which product to use by k value:
+        
 
-        prim_amines = []
-        seco_amines = []
-        tert_amines = []
-        """
-        if self.amine_type[0]:
-            patt_prim = Chem.MolFromSmarts("[D1;N]")
-            repl_prim = Chem.MolFromSmarts("[N+]")
-            outs = Chem.rdmolops.ReplaceSubstructs(mol=m, query=patt_prim, replacement=repl_prim)
-            for struct in outs:
-                ###Compute k
-                ###Compute dH
-                prim_mol = Chem.MolFromSmiles(struct)
-                Chem.AddHs(tmol2)
-                AllChem.EmbedMolecule(m2)
-                AllChem.MMFFOptimizeMolecule(m2)
-                AllChem.Compute2DCoords(tmol2)
-                Chem.MolToMolBlock(tmol2)
-        """
+        pri_cats = [ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0], n_cores=n_cores) if self.amine_type[0]] ### List comprehension solution here?
+        sec_cats = [ prod for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1], n_cores=n_cores) if self.amine_type[1]]
+        ter_cats = [ prod for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2], n_cores=n_cores) if self.amine_type[2]]
+        
+        ### Decide on which product to use by k value:
         self.score = reactant_energy
 
 
@@ -158,7 +168,6 @@ class GraphGA(GA):
         mols = [Chem.MolFromSmiles(line.strip(","))[0] for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         return population
-
 
     def crossover(self, ind1, ind2):
         mol1 = ind1.mol
@@ -219,7 +228,6 @@ if __name__ == "__main__":
     A_cat.calculate_score()
     print("Scoring value: ", A_cat.score)
 
-    m = Chem.AddHs(m)
 
 
 
