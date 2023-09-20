@@ -18,14 +18,33 @@ from xtb import xtb_calculate
 #### TODOS:
 #### - Remove hardcoded temperature
 #### - Intermediate naming for prim/seco/tert amines in the scoring function
+#### - Method based initialization of CO2/H2O/OCOO molecules.
+
+
 
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
 
     # Reactant energies given by GFN2 method with geom. opt.& GBSA solvation
-    CO2_energy  = -10.306805408736 # E_h 
-    H2O_energy  = -5.080122224999  # E_h
-    OCOO_energy = -15.215593476193 # E_h
+    CO2_energy_GFN2_GBSA  = -10.306805408736 # E_h 
+    H2O_energy_GFN2_GBSA  = -5.080122224999  # E_h
+    OCOO_energy_GFN2_GBSA = -15.215593476193 # E_h
+
+    # GFN2 method + ALPB solvation
+    CO2_energy_GFN2_ALPB  =  -10.305467633322 # E_h
+    H2O_energy_GFN2_ALPB  = -5.085033168595 # E_h
+    OCOO_energy_GFN2_ALPB = -15.218909360801 # E_h
+
+    # GFN1 method + ALPB solvation
+    CO2_energy_GFN1_ALPB  = -11.543823125467
+    H2O_energy_GFN1_ALPB  = -5.790291412071
+    OCOO_energy_GFN1_ALPB = -17.131104157996
+    #######
+    """
+    Check if CO2/H2O/OCOO are in the database. Else compute the values. -> After checking for correctness of calculations.
+    
+    """
+
 
     #Temperature of the runs:
     T_K = 313 # K
@@ -44,7 +63,7 @@ class AmineCatalyst:
         self.timing = math.nan
         self.error = ""
         self.idx = (-1, -1)
-        #self.amine_type = tuple(True if mol.HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
+        self.amine_type = tuple(True if mol.HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
         self.dHabs = math.nan #Heat of absorbtion
         self.kabs = math.nan #k of reaction limiting step. amine->bicarbonate for tertiary amines
         
@@ -66,6 +85,7 @@ class AmineCatalyst:
     def hartree_to_ev(hartree) -> float:
         ### Conversion value take from wiki
         return hartree * 27.211386245988 
+    
     @staticmethod
     def kcalmol_to_kjmol(kcalmol) -> float:
         ### Conversion value taken from wiki.
@@ -78,7 +98,7 @@ class AmineCatalyst:
         Na = 6.02214076 * 10**23 # 1/mol
         return hartree * joule * Na * 0.001 
     
-    def calculate_energy(self, n_cores, charge=0, xtb_options={"gfn":2, "opt":True, "gbsa": "water","opt_level":"tight"}):
+    def calculate_energy(self, n_cores, charge=0, xtb_options={"gfn":1, "opt":True, "alpb": "water", "opt_level":"tight"}):
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
         options = copy.copy(xtb_options)
@@ -95,14 +115,8 @@ class AmineCatalyst:
                         #randomSeed=5
                     )
         atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
-        #confs = []
-        #for conformer in self.mol.GetConformers():
-        #    coords = conformer.GetPositions()
-        #    opt_atoms, opt_coords, opt_energy = xtb_calculate(atoms=atoms, coords=coords, options=xtb_options, n_cores=n_cores
-    #)
-        #    confs.append([opt_atoms, opt_coords, opt_energy])
+
         return [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
-        #return confs
     
     def weight_energy(self, confs):
         mv = min([v[2] for v in confs])
@@ -154,16 +168,30 @@ class AmineCatalyst:
 
         ##Reactant prepare:
         reactant_confs = self.calculate_energy(n_cores=n_cores, )
-        reactant_energy = self.weight_energy(reactant_confs)+ self.CO2_energy + self.H2O_energy 
+        reactant_energy = self.weight_energy(reactant_confs)+ self.CO2_energy_GFN1_ALPB + self.H2O_energy_GFN1_ALPB
         #product_energy = 0 # Compute for each possible product OR weight them by boltzmann
-        print("Reactsnt energy: ", self.weight_energy(reactant_confs))
-        pri_cats = [ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0], n_cores=n_cores)]# if self.amine_type[0]] ### List comprehension solution here?
-        sec_cats = [ prod for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1], n_cores=n_cores)]# if self.amine_type[1]]
-        ter_cats = [ prod for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2], n_cores=n_cores)]# if self.amine_type[2]]
+        print("Reactant energy: ", self.weight_energy(reactant_confs))
+
+        if self.amine_type[0]: # If mol has primary amine
+            pri_cats = [ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0], n_cores=n_cores)]
+        else:
+            pri_cats = []
+
+        if self.amine_type[1]: # If mol has secondary amine
+            sec_cats = [ prod for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1], n_cores=n_cores)]
+        else:
+            sec_cats = []
+
+        if self.amine_type[2]: # If mol has tertiary amine.
+            ter_cats = [ prod for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2], n_cores=n_cores)]
+        else:
+            ter_cats = []
+
+
         amine_products_all = pri_cats + sec_cats + ter_cats
         print("Product smiles: ",  [val[0] for val in amine_products_all])
         ### Compute the product energy. For now I simply choose the lowest energy product.
-        product_energy = min([val[1] for val in amine_products_all]) + self.OCOO_energy
+        product_energy = min([val[1] for val in amine_products_all]) + self.OCOO_energy_GFN1_ALPB
         ### Decide on which product to use by k value:
 
         #Assign score values based on dH, k, SA
@@ -256,6 +284,7 @@ class GraphGA(GA):
 
 if __name__ == "__main__":
     import numpy as np
+    from scipy import stats
     #import time
     import pandas as pd 
     import matplotlib.pyplot as plt
@@ -268,28 +297,64 @@ if __name__ == "__main__":
     for smile, dH in zip(amines["SMILES"],amines["dH"]):
         names.append(smile)
         dHs.append(dH)
-        if cnt == 5:
-            break
-        if smile == "CCCCCCCCCCCCNCCO":
+        #if cnt == 3:
+        #     break
+        #if smile == "CCCCCCCCCCCCNCCO":
+        #    continue
+        if "." in smile:
+            """
+            sub_mols = smile.split(".")
+            tot_e = 0
+            for mol in sub_mols:
+                mol = AmineCatalyst(Chem.MolFromSmiles(smile))
+                print("Precheck")
+                mol.calculate_score()
+                tot_e += mol
+                print("Postcheck")
+                print("Score? ", mol.score)
+            calc_dH.append(abs(AmineCatalyst.hartree_to_kjmol(mol.score)))
+            """
             continue
+
 
         mol = AmineCatalyst(Chem.MolFromSmiles(smile))
         print("Precheck")
         mol.calculate_score()
         print("Postcheck")
         print("Score? ", mol.score)
-        calc_dH.append(AmineCatalyst.hartree_to_kjmol(mol.score))
+        calc_dH.append(abs(AmineCatalyst.hartree_to_kjmol(mol.score)))
         exp_dH.append(dH)
         print("MEA dH", calc_dH)
         cnt+=1
 
-    plt.scatter(exp_dH, calc_dH)
+    plt.scatter(exp_dH, calc_dH, marker="o", color="b")
     plt.xlabel("Experimental " + r"$ \Delta H $")
     plt.ylabel("Calculated "   + r"$ \Delta H $")
-    #plt.savefig("UpdatedChargesExpVsCalcDHWholeTestSet.eps", format='eps')
+    plt.axline((min(exp_dH+calc_dH),min(exp_dH+calc_dH)), slope=1)
+    slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
+    R2 = r**2
+
+    def reg_pnts(x):
+        return slope * x + intercept
+    
+    xs = np.linspace(0,100, 100)
+
+    pnts = [reg_pnts(pnt) for pnt in xs]
+    pnts = [pnt for pnt in pnts if pnt<=max(exp_dH+calc_dH)]# and pnt>min(exp_dH+calc_dH)]
+
+    plt.plot(xs[:len(pnts)], pnts, ls="--", color="grey", label=f'slope: {slope:.2f}, intercept:+ {intercept:.2f}')
+    
+    plt.plot([],[], label=f'$R^{2}$: {R2:.2f}')
+    plt.plot([] ,[], label=f'stderr: {se:.2f}')
+    plt.xlim(0,max(exp_dH+calc_dH) )
+    plt.ylim(0,max(exp_dH+calc_dH) )
+    plt.legend()
+    #plt.savefig("start_pop_no_ions_dH_Calc_GFN1_alpb_water.eps", format='eps')
     plt.show()
     plt.close()
     
+
+
     #A_cat = AmineCatalyst(m)
     #start = time.time()
     #A_cat.calculate_score()
