@@ -19,7 +19,7 @@ from xtb import xtb_calculate
 #### - Remove hardcoded temperature
 #### - Intermediate naming for prim/seco/tert amines in the scoring function
 #### - Method based initialization of CO2/H2O/OCOO molecules.
-
+#### - dH scoring for A.B ionic compounds. Retrieve reactant data to compute.
 
 
 class AmineCatalyst:
@@ -302,26 +302,31 @@ if __name__ == "__main__":
         #if smile == "CCCCCCCCCCCCNCCO":
         #    continue
         if "." in smile:
-            """
+            
             sub_mols = smile.split(".")
-            tot_e = 0
+            tot_e = 0 # Product energy
             for mol in sub_mols:
                 mol = AmineCatalyst(Chem.MolFromSmiles(smile))
-                print("Precheck")
-                mol.calculate_score()
-                tot_e += mol
-                print("Postcheck")
-                print("Score? ", mol.score)
+                confs_e = mol.calculate_energy()
+                
+            #How to score dH here???
+
+
             calc_dH.append(abs(AmineCatalyst.hartree_to_kjmol(mol.score)))
-            """
+            exp_dH.append(dH)
             continue
 
 
         mol = AmineCatalyst(Chem.MolFromSmiles(smile))
-        print("Precheck")
+        #Check database if mol was computed
+        #if mol_smile in database:
+        # fetch the energy
+        # compute score
+        #
+        #Uncouple score from energy computation -> what if I want to try different scoring functions.
+
         mol.calculate_score()
-        print("Postcheck")
-        print("Score? ", mol.score)
+
         calc_dH.append(abs(AmineCatalyst.hartree_to_kjmol(mol.score)))
         exp_dH.append(dH)
         print("MEA dH", calc_dH)
