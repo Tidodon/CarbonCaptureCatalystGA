@@ -13,7 +13,8 @@ from catalystGA import GA
 from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
 from xtb import xtb_calculate
-#from orca import orca calculate
+import sqlite3
+
 
 #### TODOS:
 #### - Remove hardcoded temperature
@@ -42,6 +43,7 @@ class AmineCatalyst:
     #######
     """
     Check if CO2/H2O/OCOO are in the database. Else compute the values. -> After checking for correctness of calculations.
+    
     """
 
 
@@ -56,14 +58,12 @@ class AmineCatalyst:
     repls =  [Chem.MolFromSmarts("[NH3+]"),Chem.MolFromSmarts("[NH2+]"),Chem.MolFromSmarts("[NH+]")]#
 
     def __init__(self, mol: Chem.Mol) -> None:
-        self.mol       = mol
-        self.program   = "xtb" # orca or xtb 
-        self.options   = {} # Specify method , solvation, opt, charge, solvent. Depending on program those will be reshaped.
-        self.score     = math.nan
-        self.fitness   = math.nan
-        self.timing    = math.nan
-        self.error     = ""
-        self.idx       = (-1, -1)
+        self.mol = mol
+        self.score = math.nan
+        self.fitness = math.nan
+        self.timing = math.nan
+        self.error = ""
+        self.idx = (-1, -1)
         self.amine_type = tuple(True if mol.HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
         self.dHabs = math.nan #Heat of absorbtion
         self.kabs = math.nan #k of reaction limiting step. amine->bicarbonate for tertiary amines
@@ -99,9 +99,15 @@ class AmineCatalyst:
         Na = 6.02214076 * 10**23 # 1/mol
         return hartree * joule * Na * 0.001 
     
-    def calculate_energy(self, n_cores, charge=0):
+    def calculate_energy(self, n_cores, charge=0, xtb_options={"gfn":1, "opt":True, "alpb": "water", "opt_level":"tight"}):
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
+
+        if "." in Chem.MolTSmiles(self.mol):
+            name = Chem.MolTSmiles(self.mol).split(".")
+
+        options = copy.copy(xtb_options)
+        options["charge"] = charge
         self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
 
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
@@ -114,15 +120,8 @@ class AmineCatalyst:
                         #randomSeed=5
                     )
         atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
-        
-        if self.program =="xtb":
-            return [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=self.options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
-        elif self.program == "orca":
-            charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
-            pass
-            #return [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=self.options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
-        else:
-            raise "Incorrect specification of the QM program."
+
+        return [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
     
     def weight_energy(self, confs):
         mv = min([v[2] for v in confs])
@@ -324,8 +323,6 @@ if __name__ == "__main__":
 
 
         mol = AmineCatalyst(Chem.MolFromSmiles(smile))
-        mol.program = "xtb"
-        mol.options = {"gfn":2, "opt":True, "alpb":"water"}
         #Check database if mol was computed
         #if mol_smile in database:
         # fetch the energy
