@@ -4,7 +4,6 @@ import sqlite3
 conn = sqlite3.connect('molecules_data.db')
 c = conn.cursor()
 
-
 # c.execute("""CREATE TABLE reactants(
 #         id INTEGER PRIMARY KEY,
 #        smiles text, 
@@ -54,7 +53,6 @@ products = [('O=C([O-])O','gfn2','gbsa','-15.215593476193'),
 #         WHERE reactants.method=products.method 
 #         AND reactants.solvation=products.solvation""")
 
-#c.execute("DELETE FROM reactants")
 ####Code to get column names:
 c.execute("SELECT * FROM reactants")
 v = c.fetchall()
@@ -67,12 +65,10 @@ v = c.fetchall()
 for val in v:
    print(val)
 
-print("Product column names: ", [desc[0] for desc in c.description])
+# print("Product column names: ", [desc[0] for desc in c.description])
 #c.execute("DROP TABLE products")
 
 
-
-#conn.commit()
 
 
 

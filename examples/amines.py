@@ -14,6 +14,7 @@ from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
 from xtb import xtb_calculate
 #from orca import orca calculate
+import sqlite3
 
 #### TODOS:
 #### - Remove hardcoded temperature
@@ -99,6 +100,58 @@ class AmineCatalyst:
         Na = 6.02214076 * 10**23 # 1/mol
         return hartree * joule * Na * 0.001 
     
+    def prepare_xtb_options(self) -> dict:
+        """
+        Build an input dicionary for the xtb_calculate function to perfrom xtb calculations.
+        """
+        xtb_options = {}
+        print("optioNS in prepration method:", self.options)
+        
+        try:
+            mtd, tp = self.options["method"].split("_")
+            xtb_options[mtd]=int(tp)
+        except:
+            print("Unspecified QM method")
+
+        try:
+            xtb_options[self.options["solvation"]] = self.options["solvent"]
+        except:
+            print("Unspecified solvation")
+
+        try:
+            xtb_options["opt"] = self.options["opt"]
+        except:
+            print("Unspecified optimization")
+
+        try:
+            xtb_options["charge"] = self.options["charge"]
+        except:
+            print("Unspecified charge")
+
+        return xtb_options #
+    
+    def prepare_orca_options(self) -> dict:
+        orca_options = {}
+        options_string = ""
+        try:
+            #mtd, tp = self.options["method"].split("_") ## Probably unnecessary for orca calculations.
+            options_string += (f'{self.options["method"]}').upper()
+        except:
+            print("Unspecified QM method")
+
+        try:
+            options_string += f' {self.options["solvation"]}({self.options["solvent"]})'.upper()
+        except:
+            print("Unspecified solvation")
+
+        if self.options["opt"]:
+            options_string += ' OPT'
+        else:
+            print("Unspecified optimization")
+
+        orca_options = {options_string:""}
+        return orca_options
+    
     def calculate_energy(self, n_cores, charge=0):
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
@@ -116,11 +169,15 @@ class AmineCatalyst:
         atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
         
         if self.program =="xtb":
-            return [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=self.options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
+            xtb_options = self.prepare_xtb_options()
+            xtb_options["charge"] = charge
+            print("XTB options: ", xtb_options)
+            return [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
         elif self.program == "orca":
             charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
+            orca_options = self.prepare_orca_options()
             pass
-            #return [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=self.options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
+            #return [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
         else:
             raise "Incorrect specification of the QM program."
     
@@ -151,12 +208,22 @@ class AmineCatalyst:
         for prod in products:
             print("Check products ",Chem.MolToSmiles(prod))
             cat = AmineCatalyst(prod)
+            cat.options = self.options
+            cat.program = self.program
             
             confs = cat.calculate_energy(n_cores=n_cores, charge=1)
 
             yield [Chem.MolToSmiles(cat.mol), cat.weight_energy(confs)]
 
-    
+    @staticmethod
+    def check_if_in_db(db_cursor ,smiles, options, table):
+        """
+        Check if a given canonical smiles molecule was computed with the method specified in options.
+        """
+        pass
+        #db_cursor.execute(f"SELECT * FROM {table} WHERE smiles={smiles} AND method={options["method"]}")
+        
+
     def calculate_score(
         self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
     ):
@@ -172,9 +239,31 @@ class AmineCatalyst:
 
         ##Check if in database, if yes -> return db values for that mol instead of computing
 
+        conn = sqlite3.connect('molecules_data.db')
+        c = conn.cursor()
+        
+        CO2_energy = 0
+        H2O_energy = 0
+        AMI_energy = 0
+        method, solvation = self.options['method'], self.options['solvation']
+        #### Check reactants:
+        CO2 = AmineCatalyst(Chem.MolFromSmiles("O=C=O"))
+        smile= "O=C=O"
+        c.execute(f"SELECT electronic_energy, dHs FROM reactants WHERE smiles={smile} AND method={method} AND solvation={solvation} ")
+        res = c.fetchall()
+        if len(res)>1:
+            print("Duplicates in database: ", "SMILES: ", smile, "Method: ", method, "Solvation: ", solvation)
+        if len(res)>=1:
+            CO2_energy = res[0]
+            
+
+        if ("O=C=O", method, solvation):
+             pass
+             c.execute("SELECT * FROM reactants WHERE smiles='O=C=O' AND ")
+
         ##Reactant prepare:
         reactant_confs = self.calculate_energy(n_cores=n_cores, )
-        reactant_energy = self.weight_energy(reactant_confs)+ self.CO2_energy_GFN1_ALPB + self.H2O_energy_GFN1_ALPB
+        reactant_energy = self.weight_energy(reactant_confs)+ self.CO2_energy_GFN2_ALPB + self.H2O_energy_GFN2_ALPB
         #product_energy = 0 # Compute for each possible product OR weight them by boltzmann
         print("Reactant energy: ", self.weight_energy(reactant_confs))
 
@@ -197,14 +286,14 @@ class AmineCatalyst:
         amine_products_all = pri_cats + sec_cats + ter_cats
         print("Product smiles: ",  [val[0] for val in amine_products_all])
         ### Compute the product energy. For now I simply choose the lowest energy product.
-        product_energy = min([val[1] for val in amine_products_all]) + self.OCOO_energy_GFN1_ALPB
+        product_energy = min([val[1] for val in amine_products_all]) + self.OCOO_energy_GFN2_ALPB
         ### Decide on which product to use by k value:
 
         #Assign score values based on dH, k, SA
 
         #dH scorings alone.
-
-        self.score = product_energy - reactant_energy 
+        self.dHabs = AmineCatalyst.hartree_to_kcalmol(product_energy - reactant_energy)
+        self.score = 0#product_energy - reactant_energy 
 
         #logP = Descriptors.MolLogP(self.mol)
         #self.score = logP
@@ -303,29 +392,29 @@ if __name__ == "__main__":
     for smile, dH in zip(amines["SMILES"],amines["dH"]):
         names.append(smile)
         dHs.append(dH)
-        #if cnt == 3:
-        #     break
-        #if smile == "CCCCCCCCCCCCNCCO":
-        #    continue
+        if cnt == 5:
+             break
+        if smile == "CCCCCCCCCCCCNCCO":
+            continue
         if "." in smile:
             
-            sub_mols = smile.split(".")
-            tot_e = 0 # Product energy
-            for mol in sub_mols:
-                mol = AmineCatalyst(Chem.MolFromSmiles(smile))
-                confs_e = mol.calculate_energy()
+            # sub_mols = smile.split(".")
+            # tot_e = 0 # Product energy
+            # for mol in sub_mols:
+            #     mol = AmineCatalyst(Chem.MolFromSmiles(smile))
+            #     confs_e = mol.calculate_energy()
                 
-            #How to score dH here???
+            # #How to score dH here???
 
 
-            calc_dH.append(abs(AmineCatalyst.hartree_to_kjmol(mol.score)))
-            exp_dH.append(dH)
+            # calc_dH.append(abs(AmineCatalyst.hartree_to_kjmol(mol.score)))
+            # exp_dH.append(dH)
             continue
 
 
         mol = AmineCatalyst(Chem.MolFromSmiles(smile))
         mol.program = "xtb"
-        mol.options = {"gfn":2, "opt":True, "alpb":"water"}
+        mol.options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
         #Check database if mol was computed
         #if mol_smile in database:
         # fetch the energy
@@ -335,7 +424,7 @@ if __name__ == "__main__":
 
         mol.calculate_score()
 
-        calc_dH.append(abs(AmineCatalyst.hartree_to_kjmol(mol.score)))
+        calc_dH.append(mol.dHabs)
         exp_dH.append(dH)
         print("MEA dH", calc_dH)
         cnt+=1
@@ -343,7 +432,7 @@ if __name__ == "__main__":
     plt.scatter(exp_dH, calc_dH, marker="o", color="b")
     plt.xlabel("Experimental " + r"$ \Delta H $")
     plt.ylabel("Calculated "   + r"$ \Delta H $")
-    plt.axline((min(exp_dH+calc_dH),min(exp_dH+calc_dH)), slope=1)
+    plt.axline(abs(min(exp_dH+calc_dH),min(exp_dH+calc_dH)), slope=1)
     slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
     R2 = r**2
 
