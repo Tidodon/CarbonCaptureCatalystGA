@@ -21,7 +21,7 @@ import sqlite3
 #### - Intermediate naming for prim/seco/tert amines in the scoring function
 #### - Method based initialization of CO2/H2O/OCOO molecules.
 #### - dH scoring for A.B ionic compounds. Retrieve reactant data to compute.
-
+#### - Deal with possible duplicates in DB: non-exact but similar namings, two rows with identical methods used but different energies.
 
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
@@ -202,7 +202,7 @@ class AmineCatalyst:
         # Sanitization step. DO NOT REMOVE. Otherwise Conformer embedding in self.calculate_energy() breaks:
         self.mol = Chem.MolFromSmiles(Chem.MolToSmiles(self.mol))
         # Replacement step. It is dependenent on the whether the molecule was sanitized or not.
-        print("CHeck recognition: ", Chem.MolToSmiles(self.mol),Chem.MolToSmarts(patt),Chem.MolToSmiles(repl))
+        print("Check recognition: ", Chem.MolToSmiles(self.mol),Chem.MolToSmarts(patt),Chem.MolToSmiles(repl))
         products = Chem.rdmolops.ReplaceSubstructs(mol=self.mol, query=patt, replacement=repl)
 
         for prod in products:
@@ -215,15 +215,13 @@ class AmineCatalyst:
 
             yield [Chem.MolToSmiles(cat.mol), cat.weight_energy(confs)]
 
-    @staticmethod
-    def check_if_in_db(db_cursor ,smiles, options, table):
-        """
-        Check if a given canonical smiles molecule was computed with the method specified in options.
-        """
-        pass
-        #db_cursor.execute(f"SELECT * FROM {table} WHERE smiles={smiles} AND method={options["method"]}")
+    # def is_in_db(self, db_cursor, table):
+    #     """
+    #     Check if a given canonical smiles molecule was computed with the method specified in options.
+    #     """
+    #     db_cursor.execute(f"SELECT electronic_energy, dHs FROM reactants WHERE smiles={smile} AND method={method} AND solvation={solvation} ")
+    #     res = db_cursor.fetchall()
         
-
     def calculate_score(
         self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
     ):
@@ -242,28 +240,61 @@ class AmineCatalyst:
         conn = sqlite3.connect('molecules_data.db')
         c = conn.cursor()
         
-        CO2_energy = 0
-        H2O_energy = 0
-        AMI_energy = 0
+        CO2_energy  = 0
+        H2O_energy  = 0
+        OCOO_energy = 0
+        c.execute("SELECT * FROM miscs")
+        
+        ##### CHECK DB FOR CO2, H2O, AMI energies given the computation method. If not found compute them and input to database.
         method, solvation = self.options['method'], self.options['solvation']
-        #### Check reactants:
-        CO2 = AmineCatalyst(Chem.MolFromSmiles("O=C=O"))
-        smile= "O=C=O"
-        c.execute(f"SELECT electronic_energy, dHs FROM reactants WHERE smiles={smile} AND method={method} AND solvation={solvation} ")
-        res = c.fetchall()
-        if len(res)>1:
-            print("Duplicates in database: ", "SMILES: ", smile, "Method: ", method, "Solvation: ", solvation)
-        if len(res)>=1:
-            CO2_energy = res[0]
-            
+        CO2_smiles, H2O_smiles, OCOO_smiles = "O=C=O", "O", "[O-]C(=O)O"
 
-        if ("O=C=O", method, solvation):
-             pass
-             c.execute("SELECT * FROM reactants WHERE smiles='O=C=O' AND ")
+        print("Method, solvation: ", method, solvation)
+        try: 
+            c.execute("SELECT smiles, energy FROM miscs WHERE method=? AND solvation=?", (method, solvation))
+            miscs_data  = c.fetchall()
+            names, es   = [ v[0] for v in miscs_data], [ v[1] for v in miscs_data]
+            CO2_energy  = float(es[names.index(CO2_smiles)])
+            H2O_energy  = float(es[names.index(H2O_smiles)])
+            OCOO_energy = float(es[names.index(OCOO_smiles)])
+        except:
+            print("Miscallenous molecules not in database. Computing and adding to database now...")
+            for name in [CO2_smiles, H2O_smiles, OCOO_smiles]:
+                charge = 0
+                if name == OCOO_smiles:
+                    charge = -1
+                
+                name_mol    = AmineCatalyst(Chem.MolFromSmiles(name))
+                confs_e     = name_mol.calculate_energy(n_cores=n_cores, charge=charge)
+                name_energy = name_mol.weight_energy(confs_e)
+                params = (name, method, solvation, name_energy)
+                c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
+
+        c.execute("SELECT * from miscs")
+        re = c.fetchall()
+        for row in re:
+            print("Misc table mol: ", row)
+        ##### Check DB for reactant energy if not computed -> compute and insert
+        
+
+        ###### Check DB for product by reactant->product ID's. if empty compute energies. Input energies to products table, 
+
+
+        #### Check reactants:
+        # CO2 = AmineCatalyst(Chem.MolFromSmiles("O=C=O"))
+        # smile = "O=C=O"
+        # c.execute(f"SELECT electronic_energy, dHs FROM reactants WHERE smiles={smile} AND method={method} AND solvation={solvation} ")
+        # res = c.fetchall()
+        # if len(res)>1:
+        #     print("Duplicates in database: ", "SMILES: ", smile, "Method: ", method, "Solvation: ", solvation)
+
+        # if ("O=C=O", method, solvation):
+        #      pass
+        #      #c.execute("SELECT * FROM reactants WHERE smiles='O=C=O' AND ")
 
         ##Reactant prepare:
         reactant_confs = self.calculate_energy(n_cores=n_cores, )
-        reactant_energy = self.weight_energy(reactant_confs)+ self.CO2_energy_GFN2_ALPB + self.H2O_energy_GFN2_ALPB
+        reactant_energy = self.weight_energy(reactant_confs)+ CO2_energy + H2O_energy
         #product_energy = 0 # Compute for each possible product OR weight them by boltzmann
         print("Reactant energy: ", self.weight_energy(reactant_confs))
 
@@ -286,7 +317,7 @@ class AmineCatalyst:
         amine_products_all = pri_cats + sec_cats + ter_cats
         print("Product smiles: ",  [val[0] for val in amine_products_all])
         ### Compute the product energy. For now I simply choose the lowest energy product.
-        product_energy = min([val[1] for val in amine_products_all]) + self.OCOO_energy_GFN2_ALPB
+        product_energy = min([val[1] for val in amine_products_all]) + OCOO_energy
         ### Decide on which product to use by k value:
 
         #Assign score values based on dH, k, SA
@@ -294,7 +325,8 @@ class AmineCatalyst:
         #dH scorings alone.
         self.dHabs = AmineCatalyst.hartree_to_kcalmol(product_energy - reactant_energy)
         self.score = 0#product_energy - reactant_energy 
-
+        conn.commit()
+        conn.close()
         #logP = Descriptors.MolLogP(self.mol)
         #self.score = logP
 
@@ -390,12 +422,13 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     for smile, dH in zip(amines["SMILES"],amines["dH"]):
-        names.append(smile)
-        dHs.append(dH)
+        
         if cnt == 5:
              break
         if smile == "CCCCCCCCCCCCNCCO":
             continue
+        names.append(smile)
+        dHs.append(dH)
         if "." in smile:
             
             # sub_mols = smile.split(".")
@@ -424,7 +457,7 @@ if __name__ == "__main__":
 
         mol.calculate_score()
 
-        calc_dH.append(mol.dHabs)
+        calc_dH.append(abs(mol.dHabs))
         exp_dH.append(dH)
         print("MEA dH", calc_dH)
         cnt+=1
@@ -432,7 +465,7 @@ if __name__ == "__main__":
     plt.scatter(exp_dH, calc_dH, marker="o", color="b")
     plt.xlabel("Experimental " + r"$ \Delta H $")
     plt.ylabel("Calculated "   + r"$ \Delta H $")
-    plt.axline(abs(min(exp_dH+calc_dH),min(exp_dH+calc_dH)), slope=1)
+    plt.axline([abs(min(exp_dH + calc_dH)),abs(min(exp_dH+calc_dH))], slope=1)
     slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
     R2 = r**2
 
@@ -455,7 +488,13 @@ if __name__ == "__main__":
     plt.show()
     plt.close()
     
-
+    conn = sqlite3.connect('molecules_data.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM miscs")
+    data = c.fetchall()
+    print([d[0] for d in c.description])
+    for row in data:
+        print(row)
 
     #A_cat = AmineCatalyst(m)
     #start = time.time()
