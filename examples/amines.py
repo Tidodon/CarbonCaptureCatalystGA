@@ -22,32 +22,13 @@ import sqlite3
 #### - Method based initialization of CO2/H2O/OCOO molecules.
 #### - dH scoring for A.B ionic compounds. Retrieve reactant data to compute.
 #### - Deal with possible duplicates in DB: non-exact but similar namings, two rows with identical methods used but different energies.
+#### - 
+
 
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
 
-    # Reactant energies given by GFN2 method with geom. opt.& GBSA solvation
-    CO2_energy_GFN2_GBSA  = -10.306805408736 # E_h 
-    H2O_energy_GFN2_GBSA  = -5.080122224999  # E_h
-    OCOO_energy_GFN2_GBSA = -15.215593476193 # E_h
 
-    # GFN2 method + ALPB solvation
-    CO2_energy_GFN2_ALPB  =  -10.305467633322 # E_h
-    H2O_energy_GFN2_ALPB  = -5.085033168595 # E_h
-    OCOO_energy_GFN2_ALPB = -15.218909360801 # E_h
-
-    # GFN1 method + ALPB solvation
-    CO2_energy_GFN1_ALPB  = -11.543823125467
-    H2O_energy_GFN1_ALPB  = -5.790291412071
-    OCOO_energy_GFN1_ALPB = -17.131104157996
-    #######
-    """
-    Check if CO2/H2O/OCOO are in the database. Else compute the values. -> After checking for correctness of calculations.
-    """
-
-
-    #Temperature of the runs:
-    T_K = 313 # K
     ### Boltzmann constant
     K_B = 3.166811563 * math.pow(10,-6) # E_h/K
 
@@ -63,6 +44,7 @@ class AmineCatalyst:
         self.score     = math.nan
         self.fitness   = math.nan
         self.timing    = math.nan
+        self.T_K       = 313 # Kelvin
         self.error     = ""
         self.idx       = (-1, -1)
         self.amine_type = tuple(True if mol.HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
@@ -214,13 +196,6 @@ class AmineCatalyst:
             confs = cat.calculate_energy(n_cores=n_cores, charge=1)
 
             yield [Chem.MolToSmiles(cat.mol), cat.weight_energy(confs)]
-
-    # def is_in_db(self, db_cursor, table):
-    #     """
-    #     Check if a given canonical smiles molecule was computed with the method specified in options.
-    #     """
-    #     db_cursor.execute(f"SELECT electronic_energy, dHs FROM reactants WHERE smiles={smile} AND method={method} AND solvation={solvation} ")
-    #     res = db_cursor.fetchall()
         
     def calculate_score(
         self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
@@ -245,7 +220,7 @@ class AmineCatalyst:
         OCOO_energy = 0
         c.execute("SELECT * FROM miscs")
         
-        ##### CHECK DB FOR CO2, H2O, AMI energies given the computation method. If not found compute them and input to database.
+        ##### CHECK DB FOR CO2, H2O, OCOO energies given the computation method. If not found compute them and input to database.
         method, solvation = self.options['method'], self.options['solvation']
         CO2_smiles, H2O_smiles, OCOO_smiles = "O=C=O", "O", "[O-]C(=O)O"
 
@@ -270,14 +245,44 @@ class AmineCatalyst:
                 params = (name, method, solvation, name_energy)
                 c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
 
-        c.execute("SELECT * from miscs")
-        re = c.fetchall()
-        for row in re:
-            print("Misc table mol: ", row)
         ##### Check DB for reactant energy if not computed -> compute and insert
-        
+        reactant_smiles = Chem.MolToSmiles(self.mol)
+        try: 
+            c.execute("SELECT id, energy, product_1_id, product_2_id, product_3_id FROM reactants WHERE method=? AND solvation=?", (method, solvation))
+            miscs_data  = c.fetchone()[0] #
+            rea_id, reactant_energy, product_1_id, product_2_id, product_3_id = tuple(miscs_data)
+            print("Successful unpacking of reactant row")
 
-        ###### Check DB for product by reactant->product ID's. if empty compute energies. Input energies to products table, 
+        except:
+            reactant_confs = self.calculate_energy(n_cores=n_cores,)
+            reactant_energy = self.weight_energy(reactant_confs)+ CO2_energy + H2O_energy
+            c.execute("INSERT INTO reactants(smiles,method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
+            c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
+            rea_id = c.fetchone()[0] 
+            product_1_id, product_2_id, product_3_id = None, None, None
+        #### Check DB for product by reactant->product ID's. if empty compute energies. Input energies to products table, 
+        prods = [None for _ in range(3)]## Hardcoded number of possible products.
+        # for n, prod_id in enumerate([product_1_id, product_2_id, product_3_id]):
+        #     if prod_id is not None:
+        #         c.execute("SELECT * FROM products WHERE id=?", (prod_id))
+        #         pro = c.fetchone()[0]
+        #         # Unpack
+        #         prods[n] = list(pro)
+        #         #id, smiles, method, solvation, energy, dH, k1, k2, k3, com = pro
+
+        #         #Do something implement product reader.
+        #         ####
+        #         ####
+        #         ####
+        #         ####
+        #         pass
+        #     elif prod_id is None:
+        #         pass
+
+        #if ??? is None:
+            #compute
+
+
 
 
         #### Check reactants:
@@ -292,9 +297,7 @@ class AmineCatalyst:
         #      pass
         #      #c.execute("SELECT * FROM reactants WHERE smiles='O=C=O' AND ")
 
-        ##Reactant prepare:
-        reactant_confs = self.calculate_energy(n_cores=n_cores, )
-        reactant_energy = self.weight_energy(reactant_confs)+ CO2_energy + H2O_energy
+        
         #product_energy = 0 # Compute for each possible product OR weight them by boltzmann
         print("Reactant energy: ", self.weight_energy(reactant_confs))
 
@@ -325,6 +328,7 @@ class AmineCatalyst:
         #dH scorings alone.
         self.dHabs = AmineCatalyst.hartree_to_kcalmol(product_energy - reactant_energy)
         self.score = 0#product_energy - reactant_energy 
+
         conn.commit()
         conn.close()
         #logP = Descriptors.MolLogP(self.mol)
@@ -423,7 +427,7 @@ if __name__ == "__main__":
 
     for smile, dH in zip(amines["SMILES"],amines["dH"]):
         
-        if cnt == 5:
+        if cnt == 1:
              break
         if smile == "CCCCCCCCCCCCNCCO":
             continue
@@ -479,8 +483,8 @@ if __name__ == "__main__":
 
     plt.plot(xs[:len(pnts)], pnts, ls="--", color="grey", label=f'slope: {slope:.2f}, intercept:+ {intercept:.2f}')
     
-    plt.plot([],[], label=f'$R^{2}$: {R2:.2f}')
-    plt.plot([] ,[], label=f'stderr: {se:.2f}')
+    plt.plot([], [], label=f'$R^{2}$: {R2:.2f}')
+    plt.plot([], [], label=f'stderr: {se:.2f}')
     plt.xlim(0,max(exp_dH+calc_dH) )
     plt.ylim(0,max(exp_dH+calc_dH) )
     plt.legend()
