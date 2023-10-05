@@ -3,8 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import List
-
-from tooltoad.utils import check_executable, stream
+from orca_utils import check_executable, stream
 
 _logger = logging.getLogger("orca")
 
