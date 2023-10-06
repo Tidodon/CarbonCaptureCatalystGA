@@ -11,8 +11,12 @@ c = conn.cursor()
 #         solvation text,
 #         energy real
 # )""")
-
-
+# c.execute("""CREATE TABLE miscs(
+#         smiles text, 
+#         method text,
+#         solvation text,
+#         energy real
+# )""")
 # c.execute("""CREATE TABLE products(
 #           id INTEGER PRIMARY KEY,
 #           smiles text,
@@ -40,13 +44,13 @@ c = conn.cursor()
 #                   ('O','gfn1','alpb','-5.790291412071'),
 #                   ('O=C=O','gfn1','alpb','-11.543823125467')]
 
-# c.executemany("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)", many_reactants)
+# c.executemany("INSERT INTO miscs(smiles, method, solvation, energy) VALUES(?,?,?,?)", many_reactants)
 
 products = [('O=C([O-])O','gfn2','gbsa','-15.215593476193'),
             ('O=C([O-])O','gfn2','alpb','-15.218909360801'),
             ('O=C([O-])O','gfn1','alpb','-17.131104157996'),
             ]
-# c.executemany("INSERT INTO products(smiles, method, solvation, energy) VALUES(?,?,?,?)", products)
+# c.executemany("INSERT INTO miscs(smiles, method, solvation, energy) VALUES(?,?,?,?)", products)
 
 # c.execute("""UPDATE reactants SET product_1_id=products.id
 #         FROM products
@@ -54,16 +58,18 @@ products = [('O=C([O-])O','gfn2','gbsa','-15.215593476193'),
 #         AND reactants.solvation=products.solvation""")
 
 ####Code to get column names:
-c.execute("SELECT * FROM reactants")
-v = c.fetchall()
-for val in v:
-    print(val)
-print("Reactant column names: ", [desc[0] for desc in c.description])
+# c.execute("SELECT * FROM reactants")
+# v = c.fetchall()
+# for val in v:
+#     print(val)
+# print("Reactant column names: ", [desc[0] for desc in c.description])
 
-c.execute("SELECT * FROM products")
-v = c.fetchall()
-for val in v:
-   print(val)
+c.execute("SELECT * FROM reactants")
+v = c.fetchall() # TUPLE object, where each element corresponds to column
+print(v)
+# for val in v:
+#    print(val)
+print("Miscs column names: ", [desc[0] for desc in c.description])
 
 # print("Product column names: ", [desc[0] for desc in c.description])
 #c.execute("DROP TABLE products")
