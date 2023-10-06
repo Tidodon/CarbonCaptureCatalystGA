@@ -63,13 +63,23 @@ products = [('O=C([O-])O','gfn2','gbsa','-15.215593476193'),
 # for val in v:
 #     print(val)
 # print("Reactant column names: ", [desc[0] for desc in c.description])
+c.execute("DELETE FROM products")
+c.execute("DELETE FROM reactants")
+c.execute("DELETE FROM miscs")
 
 c.execute("SELECT * FROM reactants")
+print("Miscs column names: ", [desc[0] for desc in c.description])
 v = c.fetchall() # TUPLE object, where each element corresponds to column
-print(v)
+for val in v:
+   print(val)
+# c.execute("SELECT * FROM products")
+# print("Miscs column names: ", [desc[0] for desc in c.description])
+# v = c.fetchall() # TUPLE object, where each element corresponds to column
+# for val in v:
+    
+#    print(val)
 # for val in v:
 #    print(val)
-print("Miscs column names: ", [desc[0] for desc in c.description])
 
 # print("Product column names: ", [desc[0] for desc in c.description])
 #c.execute("DROP TABLE products")
