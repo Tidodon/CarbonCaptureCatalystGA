@@ -22,7 +22,7 @@ import sqlite3
 #### - Method based initialization of CO2/H2O/OCOO molecules.
 #### - dH scoring for A.B ionic compounds. Retrieve reactant data to compute.
 #### - Deal with possible duplicates in DB: non-exact but similar namings, two rows with identical methods used but different energies.
-#### - 
+#### - Pack Misc values recovery into a single function.
 
 
 class AmineCatalyst:
@@ -272,6 +272,14 @@ class AmineCatalyst:
                 params = (name, method, solvation, name_energy)
                 c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
 
+                #### Temporary ugly block for misc energy values.
+                if name == CO2_smiles:
+                    CO2_energy = name_energy
+                if name == H2O_smiles:
+                    H2O_energy = name_energy
+                if name == OCOO_smiles:
+                    OCOO_energy = name_energy
+
         #####
         ##### Check DB for reactant energy if not computed -> compute and insert
         #####
@@ -325,7 +333,11 @@ class AmineCatalyst:
             ### Insert computed products into database.
             ### Link ids between reactants and products.
 
-            get_dH = lambda e_prod: abs(e_prod + OCOO_energy - reactant_energy - CO2_energy - H2O_energy )
+            def get_dH (e_prod):
+                products = e_prod + OCOO_energy
+                reactants = reactant_energy + CO2_energy + H2O_energy
+                return abs(products - reactants)
+            
 
             prods = []
 
@@ -333,6 +345,11 @@ class AmineCatalyst:
                 #reactants_energy = reactant_energy + CO2_energy + H2O_energy
                 #products_energy = amine_product[1] + OCOO_energy
                 #dH = abs(products_energy - reactants_energy)
+                print("MISCS TEsts")
+                print(smile)
+                print(CO2_smiles, CO2_energy)
+                print(H2O_smiles, H2O_energy)
+                print(OCOO_smiles, OCOO_energy)
                 dH = AmineCatalyst.hartree_to_kcalmol(get_dH(amine_product[1]))
                 amine_product[0] = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
                 print( reactant_smiles, " -> ", amine_product[0])
@@ -479,12 +496,11 @@ if __name__ == "__main__":
 
     for smile, dH in zip(amines["SMILES"],amines["dH"]):
         
-        if cnt == 2:
+        if cnt == 30:
              break
         if smile == "CCCCCCCCCCCCNCCO":
             continue
         names.append(smile)
-        dHs.append(dH)
         if "." in smile:
         
             continue
@@ -498,6 +514,8 @@ if __name__ == "__main__":
         print("mol.dHabs", mol.dHabs, type(mol.dHabs))
         calc_dH.append(abs(mol.dHabs))
         exp_dH.append(dH)
+        print("exp smiles: ", smile)
+        print("exp dH", exp_dH)
         print("MEA dH", calc_dH)
         cnt+=1
 

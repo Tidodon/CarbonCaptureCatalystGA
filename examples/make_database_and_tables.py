@@ -67,7 +67,7 @@ c.execute("DELETE FROM products")
 c.execute("DELETE FROM reactants")
 c.execute("DELETE FROM miscs")
 
-c.execute("SELECT * FROM reactants")
+c.execute("SELECT * FROM miscs")
 print("Miscs column names: ", [desc[0] for desc in c.description])
 v = c.fetchall() # TUPLE object, where each element corresponds to column
 for val in v:
