@@ -455,6 +455,8 @@ class GraphGA(GA):
             lines = f.readlines()[1:]
         mols = [Chem.MolFromSmiles(line.strip(",")[0]) for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
+        for amine in population:
+            amine.program, amine.options = comp_program, comp_options
         return population
 
     def crossover(self, ind1, ind2):
@@ -489,7 +491,7 @@ class GraphGA(GA):
         self.population = self.make_initial_population()
         print(self.population)
         self.population = self.calculate_scores(self.population, gen_id=0)
-        
+
         # self.db.add_individuals(0, self.population)
         
         # self.print_population(self.population, 0)
