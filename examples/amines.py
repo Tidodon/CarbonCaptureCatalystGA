@@ -397,7 +397,7 @@ class AmineCatalyst:
             SELECT smiles,dH FROM products
             WHERE id IN ({0})""".format(', '.join(str(i[0]) for i in prod_ids)))
         out = c.fetchall()
-        
+        print("possible dHabs: ", out)
         self.dHabs = max([dH[1] for dH in out])
 
         print("Product smiles: ",  [val[0] for val in amine_products_all])
@@ -447,6 +447,8 @@ class GraphGA(GA):
             db_location=db_location,
             scoring_kwargs=scoring_kwargs,
         )
+        self.comp_program = comp_program
+        self.comp_options = comp_options
 
     def make_initial_population(self):
         amine_pops_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
@@ -455,7 +457,7 @@ class GraphGA(GA):
         mols = [Chem.MolFromSmiles(line.split(",")[0]) for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         for amine in population:
-            amine.program, amine.options = comp_program, comp_options
+            amine.program, amine.options = self.comp_program, self.comp_options
         return population
 
     def crossover(self, ind1, ind2):
@@ -488,8 +490,11 @@ class GraphGA(GA):
         self.print_parameters()
         
         self.population = self.make_initial_population()
-        print(self.population)
+        print("Population in run: ", self.population)
         self.population = self.calculate_scores(self.population, gen_id=0)
+        for pop in self.population:
+            print(Chem.MolToSmiles(pop.mol))
+            print(pop.dHabs)
         # self.db.add_individuals(0, self.population)
         
         # self.print_population(self.population, 0)
@@ -550,6 +555,8 @@ if __name__ == "__main__":
     import pandas as pd 
     import matplotlib.pyplot as plt
     amines = pd.read_csv("examples/data/amines.csv")
+    #exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
+
     calc_dH, exp_dH = [], []
 
     cnt = 0
@@ -583,7 +590,7 @@ if __name__ == "__main__":
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=5,
+        population_size=1,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -603,7 +610,7 @@ if __name__ == "__main__":
     for molecule in results:
         print("molecuel: ", Chem.MolToSmiles(molecule.mol))
         calc_names.append(Chem.MolToSmiles(molecule.mol))
-        calc_dH.append(molecule.dHabs)
+        calc_dH.append(molecule.score)
     ##########################################################
 
 
@@ -618,7 +625,7 @@ if __name__ == "__main__":
 
     dH_df = pd.merge(exp_df, calc_df, on="SMILES")
 
-    
+
     print(dH_df)
 
     #exp_dH = [ v[2] for v in ]
