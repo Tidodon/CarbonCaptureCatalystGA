@@ -437,6 +437,8 @@ class GraphGA(GA):
         mutation_rate,
         scoring_kwargs,
         db_location,
+        comp_program,
+        comp_options,
     ):
         super().__init__(
             mol_options=mol_options,
@@ -448,9 +450,10 @@ class GraphGA(GA):
         )
 
     def make_initial_population(self):
-        with open("data/amines.csv", "r") as f: #data -> csv
-            lines = f.readlines()
-        mols = [Chem.MolFromSmiles(line.strip(","))[0] for line in lines]#[1:]
+        amine_pops_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        with open(amine_pops_path, "r") as f: #data -> csv
+            lines = f.readlines()[1:]
+        mols = [Chem.MolFromSmiles(line.strip(",")[0]) for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         return population
 
@@ -484,68 +487,33 @@ class GraphGA(GA):
         self.print_parameters()
         
         self.population = self.make_initial_population()
-        
+        print(self.population)
         self.population = self.calculate_scores(self.population, gen_id=0)
         
-        self.db.add_individuals(0, self.population)
+        # self.db.add_individuals(0, self.population)
         
-        self.print_population(self.population, 0)
+        # self.print_population(self.population, 0)
         
-        for n in range(0, self.n_generations):
-            print("N-generation: ", n, "\n")
-            self.calculate_fitness(self.population)
-            self.db.add_generation(n, self.population)
-            self.append_results(results, gennum=n, detailed=True)
-            children = self.reproduce(self.population, n + 1)
-            children = self.calculate_scores(children, gen_id=n + 1)
-            self.db.add_individuals(n + 1, children)
-            self.population = self.prune(self.population + children)
-            self.print_population(self.population, n + 1)
-        self.calculate_fitness(self.population)
-        self.db.add_generation(n + 1, self.population)
-        self.append_results(results, gennum=n + 1, detailed=True)
+        # for n in range(0, self.n_generations):
+        #     print("N-generation: ", n, "\n")
+        #     self.calculate_fitness(self.population)
+        #     self.db.add_generation(n, self.population)
+        #     self.append_results(results, gennum=n, detailed=True)
+        #     children = self.reproduce(self.population, n + 1)
+        #     children = self.calculate_scores(children, gen_id=n + 1)
+        #     self.db.add_individuals(n + 1, children)
+        #     self.population = self.prune(self.population + children)
+        #     self.print_population(self.population, n + 1)
+        # self.calculate_fitness(self.population)
+        # self.db.add_generation(n + 1, self.population)
+        # self.append_results(results, gennum=n + 1, detailed=True)
         
         return results
-
-if __name__ == "__main__":
-    import numpy as np
-    from scipy import stats
-    #import time
-    import pandas as pd 
-    import matplotlib.pyplot as plt
-    amines = pd.read_csv("examples/data/amines.csv")
-    calc_dH, exp_dH = [], []
-
-    cnt = 0
-    names, dHs = [],[]
-
-    comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
-
-    for smile, dH in zip(amines["SMILES"],amines["dH"]):
-        
-        if cnt == 3:
-             break
-        if smile == "CCCCCCCCCCCCNCCO":
-            continue
-        names.append(smile)
-        if "." in smile:
-        
-            continue
-
-
-        mol = AmineCatalyst(Chem.MolFromSmiles(smile))
-        mol.program = comp_program
-        mol.options = comp_options
-        mol.calculate_score()
-        print("mol.dHabs", mol.dHabs, type(mol.dHabs))
-        calc_dH.append(abs(mol.dHabs))
-        exp_dH.append(dH)
-        print("exp smiles: ", smile)
-        print("exp dH", exp_dH)
-        print("MEA dH", calc_dH)
-        cnt+=1
-
+    
+    def pass_opions(self, options):
+        return 0
+    
+    @staticmethod
     def plot_dH_vs_dH(exp_dH, calc_dH, options):
         assert type(options) == dict
         plt.scatter(exp_dH, calc_dH, marker="o", color="b")
@@ -578,23 +546,63 @@ if __name__ == "__main__":
         plt.show()
         plt.close()
 
-    plot_dH_vs_dH(exp_dH, calc_dH, mol.options)
-    """
+if __name__ == "__main__":
+    import numpy as np
+    from scipy import stats
+    #import time
+    import pandas as pd 
+    import matplotlib.pyplot as plt
+    amines = pd.read_csv("examples/data/amines.csv")
+    calc_dH, exp_dH = [], []
+
+    cnt = 0
+    names, dHs = [],[]
+
+    comp_program = "xtb"
+    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+
+    # for smile, dH in zip(amines["SMILES"],amines["dH"]):
+        
+    #     if cnt == 3:
+    #          break
+    #     if smile == "CCCCCCCCCCCCNCCO":
+    #         continue
+    #     names.append(smile)
+    #     if "." in smile:
+    #         continue
+
+
+    #     mol = AmineCatalyst(Chem.MolFromSmiles(smile))
+    #     mol.program = comp_program
+    #     mol.options = comp_options
+    #     mol.calculate_score()
+    #     print("mol.dHabs", mol.dHabs, type(mol.dHabs))
+    #     calc_dH.append(abs(mol.dHabs))
+    #     exp_dH.append(dH)
+    #     print("exp smiles: ", smile)
+    #     print("exp dH", exp_dH)
+    #     print("MEA dH", calc_dH)
+    #     cnt+=1
+
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
         population_size=5,
         n_generations=1,
         mutation_rate=0.0,
-        db_location="organic.sqlite",
+        db_location="molecules_data.db",
         scoring_kwargs={},
+        comp_program=comp_program,
+        comp_options=comp_options,
     )
 
     results = ga.run()
-
+    print("results: ", results)
     generations = [r[0] for r in results]
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
-    """
+
+    GraphGA.plot_dH_vs_dH(exp_dH, calc_dH, comp_options)
+
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)
     # ax.set_xlabel("Generation")
