@@ -141,13 +141,16 @@ class AmineCatalyst:
 
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
                         self.mol,
-                        clearConfs=True,
-                        #maxAttempts = 10,
+                        # clearConfs=True,
+                        # maxAttempts = 10,
                         numConfs=200,
                         useRandomCoords=True,
                         pruneRmsThresh=0.1,
                         #randomSeed=5
                     )
+        #### Force field optimize conformers.
+        AllChem.MMFFOptimizeMoleculeConfs(self.mol)
+
         atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
         
         if self.program =="xtb":
@@ -155,11 +158,27 @@ class AmineCatalyst:
             print("self options: ", self.options)
             xtb_options["charge"] = charge
             print("XTB options: ", xtb_options)
-            return [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
+            res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
+            try:
+                return res
+            except:
+                print("Incorrect termination of XTB.")
+                print(self.smiles, self.options, xtb_options)
         elif self.program == "orca":
-            charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
+            try:
+                charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
+            except:
+                charge = 0
             orca_options = self.prepare_orca_options()
-            return [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
+            print("XTB options: ", xtb_options)
+            #### Prepare orca output to same format as xtb output:
+            res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
+            try:
+                return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
+            except:
+                print("Incorrect termination of Orca. -> atoms/opt_coords/electronic_energy dict keys don't respond")
+                print(self.smiles, self.options, orca_options)
+                return [{'atoms':"", 'opt_coords':"", 'electronic_energy':""}]
         else:
             raise "Incorrect specification of the QM program."
     
@@ -423,9 +442,9 @@ class GraphGA(GA):
         )
 
     def make_initial_population(self):
-        with open("data/amines.data", "r") as f:
+        with open("data/amines.csv", "r") as f: #data -> csv
             lines = f.readlines()
-        mols = [Chem.MolFromSmiles(line.strip(","))[0] for line in lines]
+        mols = [Chem.MolFromSmiles(line.strip(","))[0] for line in lines]#[1:]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         return population
 
@@ -494,9 +513,12 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
+    comp_program = "xtb"
+    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+
     for smile, dH in zip(amines["SMILES"],amines["dH"]):
         
-        if cnt == 30:
+        if cnt == 3:
              break
         if smile == "CCCCCCCCCCCCNCCO":
             continue
@@ -507,9 +529,8 @@ if __name__ == "__main__":
 
 
         mol = AmineCatalyst(Chem.MolFromSmiles(smile))
-        mol.program = "xtb"
-        mol.options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
-
+        mol.program = comp_program
+        mol.options = comp_options
         mol.calculate_score()
         print("mol.dHabs", mol.dHabs, type(mol.dHabs))
         calc_dH.append(abs(mol.dHabs))
@@ -519,67 +540,45 @@ if __name__ == "__main__":
         print("MEA dH", calc_dH)
         cnt+=1
 
-    plt.scatter(exp_dH, calc_dH, marker="o", color="b")
-    plt.xlabel("Experimental " + r"$ \Delta H $")
-    plt.ylabel("Calculated "   + r"$ \Delta H $")
-    plt.axline([abs(min(exp_dH + calc_dH)),abs(min(exp_dH+calc_dH))], slope=1)
-    slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
-    R2 = r**2
+    def plot_dH_vs_dH(exp_dH, calc_dH, options):
+        assert type(options) == dict
+        plt.scatter(exp_dH, calc_dH, marker="o", color="b")
+        plt.xlabel("Experimental " + r"$ \Delta H $")
+        plt.ylabel("Calculated "   + r"$ \Delta H $")
+        plt.axline([abs(min(exp_dH + calc_dH)),abs(min(exp_dH+calc_dH))], slope=1)
+        slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
+        R2 = r**2
 
-    def reg_pnts(x):
-        return slope * x + intercept
+        def reg_pnts(x):
+            return slope * x + intercept
     
-    xs = np.linspace(0,100, 100)
+        xs = np.linspace(0,100, 100)
 
-    pnts = [reg_pnts(pnt) for pnt in xs]
-    pnts = [pnt for pnt in pnts if pnt<=max(exp_dH+calc_dH)]# and pnt>min(exp_dH+calc_dH)]
+        pnts = [reg_pnts(pnt) for pnt in xs]
+        pnts = [pnt for pnt in pnts if pnt<=max(exp_dH+calc_dH)]# and pnt>min(exp_dH+calc_dH)]
 
-    plt.plot(xs[:len(pnts)], pnts, ls="--", color="grey", label=f'slope: {slope:.2f}, intercept:+ {intercept:.2f}')
+        plt.plot(xs[:len(pnts)], pnts, ls="--", color="grey", label=f'slope: {slope:.2f}, intercept:+ {intercept:.2f}')
     
-    plt.plot([], [], label=f'$R^{2}$: {R2:.2f}')
-    plt.plot([], [], label=f'stderr: {se:.2f}')
-    plt.xlim(0,max(exp_dH+calc_dH) )
-    plt.ylim(0,max(exp_dH+calc_dH) )
-    plt.legend()
-    #plt.savefig("start_pop_no_ions_dH_Calc_GFN1_alpb_water.eps", format='eps')
-    plt.show()
-    plt.close()
-    
+        plt.plot([], [], label=f'$R^{2}$: {R2:.2f}')
+        plt.plot([], [], label=f'stderr: {se:.2f}')
+        plt.xlim(0,max(exp_dH+calc_dH) )
+        plt.ylim(0,max(exp_dH+calc_dH) )
+        plt.legend()
+        try:
+            figname = "_".join([str(val) for val in options.values()])+".eps"
+        except: 
+            figname = "" + ".eps"
+        plt.savefig(figname, format='eps')
+        plt.show()
+        plt.close()
 
-    #A_cat = AmineCatalyst(m)
-    #start = time.time()
-    #A_cat.calculate_score()
-    #end = time.time()
-    #print("Duration: ", end-start)
-    #print("Scoring value: ", AmineCatalyst.hartree_to_kcalmol(A_cat.score))
-
-    #population = GA.make_initial_population()
-
-
-
-
-
-   
+    plot_dH_vs_dH(exp_dH, calc_dH, mol.options)
     """
-    print("Reactant conf:", reactant_confs)
-    print("KB T_K: ", reactant_confs[0][2]/(AmineCatalyst.K_B * AmineCatalyst.T_K))
-   
-    print("Boltzmanns: ", [conf_e[2] for conf_e in reactant_confs])
-    reactant_boltzmann_dists = [math.exp(conf_e[2]/(AmineCatalyst.K_B * AmineCatalyst.T_K))  for conf_e in reactant_confs]
-    print("reactant boltz dist:", reactant_boltzmann_dists)
-    norm_factor= sum(reactant_boltzmann_dists)
-    reactant_energy = AmineCatalyst.H2O_energy + AmineCatalyst.CO2_energy + sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(reactant_boltzmann_dists, reactant_confs)])/norm_factor
-    print("reactant energy: ", reactant_energy)
-    print(reactant_energy)
-    """
-    """
-    import matplotlib.pyplot as plt
-
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
         population_size=5,
-        n_generations=5,
-        mutation_rate=0.5,
+        n_generations=1,
+        mutation_rate=0.0,
         db_location="organic.sqlite",
         scoring_kwargs={},
     )
@@ -587,12 +586,12 @@ if __name__ == "__main__":
     results = ga.run()
 
     generations = [r[0] for r in results]
-    best_scores = [max([ind.score for ind in res[1]]) for res in results]
-
-    fig, ax = plt.subplots()
-    ax.plot(generations, best_scores)
-    ax.set_xlabel("Generation")
-    ax.set_ylabel("Max Score")
-
-    plt.savefig("organic.png")
+    #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
+    calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
     """
+    # fig, ax = plt.subplots()
+    # ax.plot(generations, best_scores)
+    # ax.set_xlabel("Generation")
+    # ax.set_ylabel("Max Score")
+
+    #plt.savefig("organic.png")
