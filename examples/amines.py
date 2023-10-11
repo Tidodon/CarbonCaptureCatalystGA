@@ -164,6 +164,8 @@ class AmineCatalyst:
             except:
                 print("Incorrect termination of XTB.")
                 print(self.smiles, self.options, xtb_options)
+                return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
+
         elif self.program == "orca":
             try:
                 charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
@@ -178,7 +180,7 @@ class AmineCatalyst:
             except:
                 print("Incorrect termination of Orca. -> atoms/opt_coords/electronic_energy dict keys don't respond")
                 print(self.smiles, self.options, orca_options)
-                return [{'atoms':"", 'opt_coords':"", 'electronic_energy':""}]
+                return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
         else:
             raise "Incorrect specification of the QM program."
     
@@ -285,7 +287,9 @@ class AmineCatalyst:
                 name_mol         = AmineCatalyst(Chem.MolFromSmiles(name))
                 name_mol.options = self.options
                 print("name_mol options: ", name_mol.options)
+                ################################################
                 confs_e          = name_mol.calculate_energy(n_cores=n_cores, charge=charge)
+                ################################################
                 name_energy      = name_mol.weight_energy(confs_e)
                 print("Miscs except: ", name, name_energy)
                 params = (name, method, solvation, name_energy)
@@ -313,7 +317,9 @@ class AmineCatalyst:
             print("Successful unpacking of reactant row")
 
         except:
+            ################################################
             reactant_confs = self.calculate_energy(n_cores=n_cores,)
+            ################################################
             reactant_energy = self.weight_energy(reactant_confs)
             print("inside except reactant energy: ", reactant_energy)
 
@@ -342,8 +348,9 @@ class AmineCatalyst:
 
 
             ### Compute primary/secondary/tertiary amine protonation product.
+            ################################################
             amine_products_all = self.compute_products(n_cores=n_cores)
-            
+            ################################################
 
             ### Just for information -> If it gets shown often I will need to introduce more product id's
             if len(amine_products_all) > 3:
@@ -356,7 +363,6 @@ class AmineCatalyst:
                 products = e_prod + OCOO_energy
                 reactants = reactant_energy + CO2_energy + H2O_energy
                 return abs(products - reactants)
-            
 
             prods = []
 
@@ -387,7 +393,7 @@ class AmineCatalyst:
 
         prod_ids =[ (pid,) for pid in prod_ids ]
         print("pord_ids, ", len(prod_ids))
-        #c.executemany("SELECT dH FROM products WHERE id=?", prod_ids)
+
         c.execute("""
             SELECT smiles,dH FROM products
             WHERE id IN ({0})""".format(', '.join(str(i[0]) for i in prod_ids)))
