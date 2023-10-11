@@ -371,7 +371,6 @@ class AmineCatalyst:
                 #products_energy = amine_product[1] + OCOO_energy
                 #dH = abs(products_energy - reactants_energy)
                 print("MISCS TEsts")
-                print(smile)
                 print(CO2_smiles, CO2_energy)
                 print(H2O_smiles, H2O_energy)
                 print(OCOO_smiles, OCOO_energy)
@@ -453,7 +452,7 @@ class GraphGA(GA):
         amine_pops_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
         with open(amine_pops_path, "r") as f: #data -> csv
             lines = f.readlines()[1:]
-        mols = [Chem.MolFromSmiles(line.strip(",")[0]) for line in lines]
+        mols = [Chem.MolFromSmiles(line.split(",")[0]) for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         for amine in population:
             amine.program, amine.options = comp_program, comp_options
@@ -491,7 +490,6 @@ class GraphGA(GA):
         self.population = self.make_initial_population()
         print(self.population)
         self.population = self.calculate_scores(self.population, gen_id=0)
-
         # self.db.add_individuals(0, self.population)
         
         # self.print_population(self.population, 0)
@@ -510,10 +508,7 @@ class GraphGA(GA):
         # self.db.add_generation(n + 1, self.population)
         # self.append_results(results, gennum=n + 1, detailed=True)
         
-        return results
-    
-    def pass_opions(self, options):
-        return 0
+        return self.population#results
     
     @staticmethod
     def plot_dH_vs_dH(exp_dH, calc_dH, options):
@@ -591,7 +586,7 @@ if __name__ == "__main__":
         population_size=5,
         n_generations=1,
         mutation_rate=0.0,
-        db_location="molecules_data.db",
+        db_location="organic.sqlite",
         scoring_kwargs={},
         comp_program=comp_program,
         comp_options=comp_options,
@@ -599,9 +594,38 @@ if __name__ == "__main__":
 
     results = ga.run()
     print("results: ", results)
-    generations = [r[0] for r in results]
+
+
+    ##########################################################
+    ###Temporary code for benchmarking dH computations.#######
+    ##########################################################
+    calc_names, calc_dH = [],[]
+    for molecule in results:
+        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+        calc_names.append(Chem.MolToSmiles(molecule.mol))
+        calc_dH.append(molecule.dHabs)
+    ##########################################################
+
+
+    ##########################################################
+    ################Plotting preparation.####################
+    ##########################################################
+    exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
+    exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
+
+    exp_df = pd.DataFrame({"SMILES":exp_names, "dH_exp":exp_dH})
+    calc_df = pd.DataFrame({"SMILES":calc_names, "dH_calc":calc_dH})
+
+    dH_df = pd.merge(exp_df, calc_df, on="SMILES")
+
+    
+    print(dH_df)
+
+    #exp_dH = [ v[2] for v in ]
+
+    #generations = [r[0] for r in results]
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
-    calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
+    #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
     GraphGA.plot_dH_vs_dH(exp_dH, calc_dH, comp_options)
 
