@@ -19,11 +19,10 @@ import sqlite3
 #### TODOS:
 #### - Remove hardcoded temperature
 #### - Intermediate naming for prim/seco/tert amines in the scoring function
-#### - Method based initialization of CO2/H2O/OCOO molecules.
 #### - dH scoring for A.B ionic compounds. Retrieve reactant data to compute.
 #### - Deal with possible duplicates in DB: non-exact but similar namings, two rows with identical methods used but different energies.
 #### - Pack Misc values recovery into a single function.
-
+#### - ga.run outputs -> mol, score, dH, k, "which k?"
 
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
@@ -137,6 +136,7 @@ class AmineCatalyst:
     def calculate_energy(self, n_cores, charge=0):
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
+
         self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
 
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
@@ -148,8 +148,13 @@ class AmineCatalyst:
                         pruneRmsThresh=0.1,
                         #randomSeed=5
                     )
-        #### Force field optimize conformers.
-        AllChem.MMFFOptimizeMoleculeConfs(self.mol)
+        
+        ################## Force field optimize conformers. ##################
+
+        AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94s')
+
+        ######################################################################
+
 
         atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
         
@@ -190,6 +195,22 @@ class AmineCatalyst:
         boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
         return sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
         
+    def compute_and_weight_energy(self, n_cores, charge):
+        mol_name = Chem.MolToSmiles(self.mol)
+        if "." in mol_name:
+            submols = mol_name.split(".")
+            tot_e = 0
+            for submol in submols:
+                sub = AmineCatalyst(Chem.MolFromSmiles(submol))
+                charge = Chem.rdmolops.GetFormalCharge(sub.mol)
+                sub.program, sub.options = self.program, self.options
+                confs = sub.calculate_energy(n_cores=n_cores, charge=charge)
+                tot_e += sub.weight_energy(confs)
+            return tot_e
+        else:
+            confs = self.calculate_energy(n_cores=n_cores, charge=charge)
+            return self.weight_energy(confs)
+
     def cat_products(self, patt, repl, n_cores):
         """
         A generator method that gives smiles representation 
@@ -213,10 +234,9 @@ class AmineCatalyst:
             cat = AmineCatalyst(prod)
             cat.options = self.options
             cat.program = self.program
-            
-            confs = cat.calculate_energy(n_cores=n_cores, charge=1)
+                    
 
-            yield [Chem.MolToSmiles(cat.mol), cat.weight_energy(confs)]
+            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy(self, n_cores=n_cores, charge=1)]
 
     def compute_products(self, n_cores):
         if self.amine_type[0]: # If mol has primary amine
@@ -288,9 +308,9 @@ class AmineCatalyst:
                 name_mol.options = self.options
                 print("name_mol options: ", name_mol.options)
                 ################################################
-                confs_e          = name_mol.calculate_energy(n_cores=n_cores, charge=charge)
+                #confs_e          = name_mol.calculate_energy(n_cores=n_cores, charge=charge)
                 ################################################
-                name_energy      = name_mol.weight_energy(confs_e)
+                name_energy      = name_mol.compute_and_weight_energy(n_cores=n_cores, charge=charge)#name_mol.weight_energy(confs_e)
                 print("Miscs except: ", name, name_energy)
                 params = (name, method, solvation, name_energy)
                 c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
@@ -318,9 +338,10 @@ class AmineCatalyst:
 
         except:
             ################################################
-            reactant_confs = self.calculate_energy(n_cores=n_cores,)
+            #reactant_confs = self.calculate_energy(n_cores=n_cores,)
             ################################################
-            reactant_energy = self.weight_energy(reactant_confs)
+            #reactant_energy = self.weight_energy(reactant_confs)
+            reactant_energy = self.compute_and_weight_energy(n_cores=n_cores, charge=0)
             print("inside except reactant energy: ", reactant_energy)
 
             c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
