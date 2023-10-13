@@ -236,7 +236,7 @@ class AmineCatalyst:
             cat.program = self.program
                     
 
-            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy(self, n_cores=n_cores, charge=1)]
+            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy( n_cores=n_cores, charge=1)]
 
     def compute_products(self, n_cores):
         if self.amine_type[0]: # If mol has primary amine
@@ -620,7 +620,6 @@ if __name__ == "__main__":
         comp_program=comp_program,
         comp_options=comp_options,
     )
-
     results = ga.run()
     print("results: ", results)
 
