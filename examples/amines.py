@@ -516,6 +516,7 @@ class GraphGA(GA):
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
+        results = self.population
         # self.db.add_individuals(0, self.population)
         
         # self.print_population(self.population, 0)
@@ -534,7 +535,7 @@ class GraphGA(GA):
         # self.db.add_generation(n + 1, self.population)
         # self.append_results(results, gennum=n + 1, detailed=True)
         
-        return self.population#results
+        return results
     
     @staticmethod
     def plot_dH_vs_dH(exp_dH, calc_dH, options):
@@ -655,7 +656,7 @@ if __name__ == "__main__":
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
-    GraphGA.plot_dH_vs_dH(exp_dH, calc_dH, comp_options)
+    GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], comp_options)
 
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)
