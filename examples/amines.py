@@ -472,7 +472,7 @@ class GraphGA(GA):
         self.comp_options = comp_options
 
     def make_initial_population(self):
-        amine_pops_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        amine_pops_path = "/examples/data/amines.csv"
         with open(amine_pops_path, "r") as f: #data -> csv
             lines = f.readlines()[1:]
         mols = [Chem.MolFromSmiles(line.split(",")[0]) for line in lines]
