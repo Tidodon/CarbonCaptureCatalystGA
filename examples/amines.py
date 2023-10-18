@@ -9,6 +9,8 @@ import copy
 import sys
 sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
 sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/catalystGA")
+#sys.path.append("/CarbonCapture/CarbonCaptureCatalystGA/catalystGA")
+#sys.path.append("/CarbonCapture/CarbonCaptureCatalystGA/")
 from catalystGA import GA
 from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
@@ -23,6 +25,7 @@ import sqlite3
 #### - Deal with possible duplicates in DB: non-exact but similar namings, two rows with identical methods used but different energies.
 #### - Pack Misc values recovery into a single function.
 #### - ga.run outputs -> mol, score, dH, k, "which k?"
+#### - amine_products_all -> order by energies to only recover relevant protonation sites.
 
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
@@ -129,7 +132,6 @@ class AmineCatalyst:
             options_string += ' OPT'
         else:
             print("Unspecified optimization")
-
         orca_options = {options_string:""}
         return orca_options
     
@@ -138,12 +140,12 @@ class AmineCatalyst:
         # The energy is weighted by the contribution of individual conformers.
 
         self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
-
+        print("Name of mol:", Chem.MolToSmiles(self.mol))
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
                         self.mol,
                         # clearConfs=True,
                         # maxAttempts = 10,
-                        numConfs=200,
+                        numConfs=2000,
                         useRandomCoords=True,
                         pruneRmsThresh=0.1,
                         #randomSeed=5
@@ -151,7 +153,7 @@ class AmineCatalyst:
         
         ################## Force field optimize conformers. ##################
 
-        AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94s')
+        #AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
 
         ######################################################################
 
@@ -163,8 +165,8 @@ class AmineCatalyst:
             print("self options: ", self.options)
             xtb_options["charge"] = charge
             print("XTB options: ", xtb_options)
-            res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
             try:
+                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
                 return res
             except:
                 print("Incorrect termination of XTB.")
@@ -179,10 +181,10 @@ class AmineCatalyst:
             orca_options = self.prepare_orca_options()
             print("XTB options: ", xtb_options)
             #### Prepare orca output to same format as xtb output:
-            res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
             try:
                 return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
             except:
+                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
                 print("Incorrect termination of Orca. -> atoms/opt_coords/electronic_energy dict keys don't respond")
                 print(self.smiles, self.options, orca_options)
                 return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
@@ -329,24 +331,24 @@ class AmineCatalyst:
         reactant_smiles = Chem.MolToSmiles(self.mol)
         rea_id = None
         reactant_energy = 0
+
+        ### Try reading data from database.
         try: 
             c.execute("SELECT id, energy, product_1_id, product_2_id, product_3_id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles,method, solvation))
             reacs_data  = c.fetchone() #
             rea_id, reactant_energy, product_1_id, product_2_id, product_3_id = reacs_data
             print("inside try reactant energy: ", reactant_energy)
             print("Successful unpacking of reactant row")
-
+        ### If the data reading step fails compute the reactant value and insert it to database.
         except:
-            ################################################
-            #reactant_confs = self.calculate_energy(n_cores=n_cores,)
-            ################################################
-            #reactant_energy = self.weight_energy(reactant_confs)
+
             reactant_energy = self.compute_and_weight_energy(n_cores=n_cores, charge=0)
+
             print("inside except reactant energy: ", reactant_energy)
 
             c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
             c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
-            rea_id = c.fetchone()[0]
+            rea_id = int(c.fetchone()[0])
             product_1_id, product_2_id, product_3_id = None, None, None
         #### Check DB for product by reactant->product ID's. if empty compute energies. Input energies to products table, 
         prods = [None for _ in range(3)]## Hardcoded number of possible products.
@@ -354,7 +356,7 @@ class AmineCatalyst:
         ### Unpack precomputed information from SQL database.
         for n, prod_id in enumerate([product_1_id, product_2_id, product_3_id]):
             if prod_id is not None:
-                c.execute("SELECT * FROM products WHERE id=?", (str(prod_id)))
+                c.execute("SELECT * FROM products WHERE id=?", str(prod_id))
                 pro = c.fetchone()
                 print("Pro objec : ", pro)
                 # Unpack
@@ -362,11 +364,10 @@ class AmineCatalyst:
             else:
                 continue
 
-        ### Given none products exist already -> compute them.
+        ### Given no products exist already -> compute them.
         prod_ids = []
         print("prods, truth", prods, all(val is None for val in prods))
         if all(val is None for val in prods):
-
 
             ### Compute primary/secondary/tertiary amine protonation product.
             ################################################
@@ -381,6 +382,7 @@ class AmineCatalyst:
             ### Link ids between reactants and products.
 
             def get_dH (e_prod):
+
                 products = e_prod + OCOO_energy
                 reactants = reactant_energy + CO2_energy + H2O_energy
                 return abs(products - reactants)
@@ -395,6 +397,16 @@ class AmineCatalyst:
                 print(CO2_smiles, CO2_energy)
                 print(H2O_smiles, H2O_energy)
                 print(OCOO_smiles, OCOO_energy)
+
+                eles = [ amine_product[1], OCOO_energy, reactant_energy, CO2_energy, H2O_energy]
+                ele_names = [ amine_product[0], OCOO_smiles, Chem.MolToSmiles(self.mol), CO2_smiles, H2O_smiles]
+
+                #####CHECK for correct computation and assigning of values.
+                for ele, ele_name in zip(eles, ele_names):
+                    if ele is None:
+                        print("This is None: ", ele_name, ele)
+
+
                 dH = AmineCatalyst.hartree_to_kcalmol(get_dH(amine_product[1]))
                 amine_product[0] = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
                 print( reactant_smiles, " -> ", amine_product[0])
@@ -407,7 +419,7 @@ class AmineCatalyst:
                 prods.append(prod_am)
                 query = f'UPDATE reactants SET {prod_id_col_name}=? WHERE id=?'
                 print("Check query: ", query)
-                c.execute(query, ([prod_id, rea_id]))
+                c.execute(query, ([prod_am[0], rea_id]))
         else:
             prod_ids = [prod[0] for prod in prods]
 
@@ -419,6 +431,9 @@ class AmineCatalyst:
             WHERE id IN ({0})""".format(', '.join(str(i[0]) for i in prod_ids)))
         out = c.fetchall()
         print("possible dHabs: ", out)
+
+        print("Reactant energy fo water: ", reactant_energy)
+
         self.dHabs = max([dH[1] for dH in out])
 
         print("Product smiles: ",  [val[0] for val in amine_products_all])
@@ -427,10 +442,6 @@ class AmineCatalyst:
         #product_energy = 0 # Compute for each possible product OR weight them by boltzmann
         # print("Reactant energy: ", self.weight_energy(reactant_confs))
 
-        
-
-
-        
         ### Decide on which product to use by k value:
 
         #Assign score values based on dH, k, SA
@@ -472,6 +483,7 @@ class GraphGA(GA):
         self.comp_options = comp_options
 
     def make_initial_population(self):
+        #amine_pops_path = "/CarbonCapture/CarbonCaptureGA/catalystGA/examples/data/amines.csv"
         amine_pops_path = "/examples/data/amines.csv"
         with open(amine_pops_path, "r") as f: #data -> csv
             lines = f.readlines()[1:]
@@ -585,30 +597,8 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+    comp_options = {"method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}
 
-    # for smile, dH in zip(amines["SMILES"],amines["dH"]):
-        
-    #     if cnt == 3:
-    #          break
-    #     if smile == "CCCCCCCCCCCCNCCO":
-    #         continue
-    #     names.append(smile)
-    #     if "." in smile:
-    #         continue
-
-
-    #     mol = AmineCatalyst(Chem.MolFromSmiles(smile))
-    #     mol.program = comp_program
-    #     mol.options = comp_options
-    #     mol.calculate_score()
-    #     print("mol.dHabs", mol.dHabs, type(mol.dHabs))
-    #     calc_dH.append(abs(mol.dHabs))
-    #     exp_dH.append(dH)
-    #     print("exp smiles: ", smile)
-    #     print("exp dH", exp_dH)
-    #     print("MEA dH", calc_dH)
-    #     cnt+=1
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
@@ -617,11 +607,11 @@ if __name__ == "__main__":
         mutation_rate=0.0,
         db_location="organic.sqlite",
         scoring_kwargs={},
-        comp_program=comp_program,
         comp_options=comp_options,
+        comp_program=comp_program
     )
     results = ga.run()
-    print("results: ", results)
+
 
 
     ##########################################################
