@@ -26,6 +26,8 @@ import sqlite3
 #### - Pack Misc values recovery into a single function.
 #### - ga.run outputs -> mol, score, dH, k, "which k?"
 #### - amine_products_all -> order by energies to only recover relevant protonation sites.
+#### - CO2_energy, H2O_energy, OCOO_energy = self.compute_misc_energies() -> Implement as a separate function.
+
 
 class AmineCatalyst:
     save_attributes = {}  # any other attributes to save to the database
@@ -52,6 +54,8 @@ class AmineCatalyst:
         self.amine_type = tuple(True if mol.HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
         self.dHabs = math.nan #Heat of absorbtion
         self.kabs = math.nan #k of reaction limiting step. amine->bicarbonate for tertiary amines
+        self.results = [] #Holder for a an AmineCatalyst Object's computed energies and later k values. 
+        #Format [0]:Reactant(E), [1]Prod1:[dG1, dG2, dG3], [2]Prod2:[dG1, dG2, dG3], [3]Prod3:[dG1, dG2, dG3]
         
     @property
     def smiles(self) -> str:
@@ -273,6 +277,31 @@ class AmineCatalyst:
 
         ##Check if in database, if yes -> return db values for that mol instead of computing
 
+
+        #Precomputation flags. I assume that the molecules are found in the database. 
+        # If not the flags will be flipped and the computation performed.
+        compute_miscs = False
+        compute_reactant = False
+        compute_products = False
+
+
+        CO2_energy  = 0
+        H2O_energy  = 0
+        OCOO_energy = 0
+
+        method, solvation = self.options['method'], self.options['solvation']
+        CO2_smiles, H2O_smiles, OCOO_smiles = "O=C=O", "O", "[O-]C(=O)O"
+        
+
+
+        reactant_smiles = Chem.MolToSmiles(self.mol)
+        rea_id = None
+        reactant_energy = 0
+
+        product_1_id, product_2_id, product_3_id = None, None, None
+        prods = [None for _ in range(3)]## Hardcoded number of possible products.
+        prod_ids = []
+
         conn = sqlite3.connect('molecules_data.db')
         c = conn.cursor()
         
@@ -282,15 +311,8 @@ class AmineCatalyst:
         ##### CHECK DB FOR CO2, H2O, OCOO energies given the computation method. If not found compute them and input to database.
         #####
 
-        CO2_energy  = 0
-        H2O_energy  = 0
-        OCOO_energy = 0
 
-        method, solvation = self.options['method'], self.options['solvation']
 
-        CO2_smiles, H2O_smiles, OCOO_smiles = "O=C=O", "O", "[O-]C(=O)O"
-
-        print("Method, solvation: ", method, solvation)
         try: 
             c.execute("SELECT smiles, energy FROM miscs WHERE method=? AND solvation=?", (method, solvation))
             miscs_data  = c.fetchall()
@@ -300,7 +322,32 @@ class AmineCatalyst:
             OCOO_energy = float(es[names.index(OCOO_smiles)])
             print("Miscs energies test: ", CO2_energy,H2O_energy,OCOO_energy)
         except:
+            compute_miscs = True
+
+        try: 
+            c.execute("SELECT id, energy, product_1_id, product_2_id, product_3_id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles,method, solvation))
+            reacs_data  = c.fetchone() #
+            rea_id, reactant_energy, product_1_id, product_2_id, product_3_id = reacs_data
+            print("Reactant recovery test: ", rea_id, reactant_energy, product_1_id, product_2_id, product_3_id)
+            print("Successful unpacking of reactant row")
+            ### If the data reading step fails compute the reactant value and insert it to database.
+        except:
+            compute_reactant = True
+
+        if all(val is None for val in prods):
+            compute_products = True
+
+        for n, prod_id in enumerate([product_1_id, product_2_id, product_3_id]):
+            if prod_id is not None:
+                c.execute("SELECT * FROM products WHERE id=?", str(prod_id))
+                pro = c.fetchone()
+                prods[n] = tuple([pro[1], pro[4]]) 
+
+
+        #####Computation blocks.
+        if compute_miscs:
             print("Miscallenous molecules not in database. Computing and adding to database now...")
+
             for name in [CO2_smiles, H2O_smiles, OCOO_smiles]:
                 charge = 0
                 if name == OCOO_smiles:
@@ -309,13 +356,7 @@ class AmineCatalyst:
                 name_mol         = AmineCatalyst(Chem.MolFromSmiles(name))
                 name_mol.options = self.options
                 print("name_mol options: ", name_mol.options)
-                ################################################
-                #confs_e          = name_mol.calculate_energy(n_cores=n_cores, charge=charge)
-                ################################################
                 name_energy      = name_mol.compute_and_weight_energy(n_cores=n_cores, charge=charge)#name_mol.weight_energy(confs_e)
-                print("Miscs except: ", name, name_energy)
-                params = (name, method, solvation, name_energy)
-                c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
 
                 #### Temporary ugly block for misc energy values.
                 if name == CO2_smiles:
@@ -325,50 +366,12 @@ class AmineCatalyst:
                 if name == OCOO_smiles:
                     OCOO_energy = name_energy
 
-        #####
-        ##### Check DB for reactant energy if not computed -> compute and insert
-        #####
-        reactant_smiles = Chem.MolToSmiles(self.mol)
-        rea_id = None
-        reactant_energy = 0
 
-        ### Try reading data from database.
-        try: 
-            c.execute("SELECT id, energy, product_1_id, product_2_id, product_3_id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles,method, solvation))
-            reacs_data  = c.fetchone() #
-            rea_id, reactant_energy, product_1_id, product_2_id, product_3_id = reacs_data
-            print("inside try reactant energy: ", reactant_energy)
-            print("Successful unpacking of reactant row")
-        ### If the data reading step fails compute the reactant value and insert it to database.
-        except:
-
+        if compute_reactant:
             reactant_energy = self.compute_and_weight_energy(n_cores=n_cores, charge=0)
-
             print("inside except reactant energy: ", reactant_energy)
 
-            c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
-            c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
-            rea_id = int(c.fetchone()[0])
-            product_1_id, product_2_id, product_3_id = None, None, None
-        #### Check DB for product by reactant->product ID's. if empty compute energies. Input energies to products table, 
-        prods = [None for _ in range(3)]## Hardcoded number of possible products.
-
-        ### Unpack precomputed information from SQL database.
-        for n, prod_id in enumerate([product_1_id, product_2_id, product_3_id]):
-            if prod_id is not None:
-                c.execute("SELECT * FROM products WHERE id=?", str(prod_id))
-                pro = c.fetchone()
-                print("Pro objec : ", pro)
-                # Unpack
-                prods[n] = list(pro)
-            else:
-                continue
-
-        ### Given no products exist already -> compute them.
-        prod_ids = []
-        print("prods, truth", prods, all(val is None for val in prods))
-        if all(val is None for val in prods):
-
+        if compute_products:
             ### Compute primary/secondary/tertiary amine protonation product.
             ################################################
             amine_products_all = self.compute_products(n_cores=n_cores)
@@ -378,65 +381,39 @@ class AmineCatalyst:
             if len(amine_products_all) > 3:
                 print("More than 3 possible protonation sites.")
 
-            ### Insert computed products into database.
-            ### Link ids between reactants and products.
 
-            def get_dH (e_prod):
-
-                products = e_prod + OCOO_energy
-                reactants = reactant_energy + CO2_energy + H2O_energy
-                return abs(products - reactants)
-
-            prods = []
-
-            for amine_product, prod_id_col_name in zip(amine_products_all[:3], ['product_1_id','product_2_id','product_3_id']):
-                #reactants_energy = reactant_energy + CO2_energy + H2O_energy
-                #products_energy = amine_product[1] + OCOO_energy
-                #dH = abs(products_energy - reactants_energy)
-                print("MISCS TEsts")
-                print(CO2_smiles, CO2_energy)
-                print(H2O_smiles, H2O_energy)
-                print(OCOO_smiles, OCOO_energy)
-
-                eles = [ amine_product[1], OCOO_energy, reactant_energy, CO2_energy, H2O_energy]
-                ele_names = [ amine_product[0], OCOO_smiles, Chem.MolToSmiles(self.mol), CO2_smiles, H2O_smiles]
-
-                #####CHECK for correct computation and assigning of values.
-                for ele, ele_name in zip(eles, ele_names):
-                    if ele is None:
-                        print("This is None: ", ele_name, ele)
+            for prod in amine_products_all:
+                prods.append(prod)
 
 
-                dH = AmineCatalyst.hartree_to_kcalmol(get_dH(amine_product[1]))
-                amine_product[0] = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
-                print( reactant_smiles, " -> ", amine_product[0])
-                print( reactant_energy, " -> ", amine_product[1])
+        def get_dH (e_prod):
 
-                c.execute("INSERT INTO products(smiles,method,solvation, energy, dH, reactant_id) VALUES(?,?,?,?,?,?)", (amine_product[0], method, solvation,amine_product[1], dH, rea_id))
-                c.execute("SELECT * FROM products WHERE smiles=? AND method=? AND solvation=?", (amine_product[0], method, solvation))
-                prod_am = c.fetchone()
-                prod_ids.append(prod_am[0])
-                prods.append(prod_am)
-                query = f'UPDATE reactants SET {prod_id_col_name}=? WHERE id=?'
-                print("Check query: ", query)
-                c.execute(query, ([prod_am[0], rea_id]))
-        else:
-            prod_ids = [prod[0] for prod in prods]
+            products = e_prod + OCOO_energy
+            reactants = reactant_energy + CO2_energy + H2O_energy
+            return abs(products - reactants)
+        
 
-        prod_ids =[ (pid,) for pid in prod_ids ]
-        print("pord_ids, ", len(prod_ids))
+        #### Check that all energies are not None
+        ##### Compute dH value for each of the products.
 
-        c.execute("""
-            SELECT smiles,dH FROM products
-            WHERE id IN ({0})""".format(', '.join(str(i[0]) for i in prod_ids)))
-        out = c.fetchall()
-        print("possible dHabs: ", out)
+        dHs = []
+        for amine_product in prods:
+            eles = [ amine_product[1], OCOO_energy, reactant_energy, CO2_energy, H2O_energy]
+            ele_names = [ amine_product[0], OCOO_smiles, Chem.MolToSmiles(self.mol), CO2_smiles, H2O_smiles]
 
-        print("Reactant energy fo water: ", reactant_energy)
+            #####CHECK for correct computation and assigning of values.
+            for ele, ele_name in zip(eles, ele_names):
+                if ele is None:
+                    print("This is None: ", ele_name, ele)
 
-        self.dHabs = max([dH[1] for dH in out])
+            amine_product[0] = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
+            dHs.append([amine_product[0], AmineCatalyst.hartree_to_kcalmol(get_dH(amine_product[1]))])
 
-        print("Product smiles: ",  [val[0] for val in amine_products_all])
+
+        self.dHabs = max(dHs)
+
+        print( reactant_smiles, " -> ", amine_product[0])
+        print( reactant_energy, " -> ", amine_product[1])
 
 
         #product_energy = 0 # Compute for each possible product OR weight them by boltzmann
@@ -453,6 +430,49 @@ class AmineCatalyst:
         #c.execute("DELETE FROM reactants")
         #c.execute("DELETE FROM miscs")
 
+        ######## INSERTIONS TO MOVE OTHERPLACE
+        #print("Miscs except: ", name, name_energy)
+        #params = (name, method, solvation, name_energy)
+        #c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
+        ########
+
+        # c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
+        # c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
+        # rea_id = int(c.fetchone()[0])
+        # rea_id, reactant_energy, product_1_id, product_2_id, product_3_id
+
+        # c.execute("INSERT INTO products(smiles,method,solvation, energy, dH, reactant_id) VALUES(?,?,?,?,?,?)", (amine_product[0], method, solvation,amine_product[1], dH, rea_id))
+        # c.execute("SELECT * FROM products WHERE smiles=? AND method=? AND solvation=?", (amine_product[0], method, solvation))
+        # prod_am = c.fetchone()
+        # prod_ids.append(prod_am[0])
+        # prods.append(prod_am)
+        # query = f'UPDATE reactants SET {prod_id_col_name}=? WHERE id=?'
+        # print("Check query: ", query)
+        # c.execute(query, ([prod_am[0], rea_id]))
+
+
+        # prod_ids =[ (pid,) for pid in prod_ids ]
+        # print("pord_ids, ", len(prod_ids))
+
+        # c.execute("""
+        #     SELECT smiles,dH FROM products
+        #     WHERE id IN ({0})""".format(', '.join(str(i[0]) for i in prod_ids)))
+        # out = c.fetchall()
+        # print("possible dHabs: ", out)
+
+        # print("Reactant energy fo water: ", reactant_energy)
+
+        # self.dHabs = max([dH[1] for dH in out])
+
+        # print("Product smiles: ",  [val[0] for val in amine_products_all])
+
+
+
+        ####Later a reordering code will be added here.
+
+        #order_amine_products(dH, dG) -> top three most reactive. 
+
+        #####
 
         conn.commit()
         conn.close()
@@ -483,8 +503,8 @@ class GraphGA(GA):
         self.comp_options = comp_options
 
     def make_initial_population(self):
-        #amine_pops_path = "/CarbonCapture/CarbonCaptureGA/catalystGA/examples/data/amines.csv"
-        amine_pops_path = "/examples/data/amines.csv"
+        #amine_pops_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        amine_pops_path = "examples/data/amines.csv"
         with open(amine_pops_path, "r") as f: #data -> csv
             lines = f.readlines()[1:]
         mols = [Chem.MolFromSmiles(line.split(",")[0]) for line in lines]
@@ -610,7 +630,11 @@ if __name__ == "__main__":
         comp_options=comp_options,
         comp_program=comp_program
     )
-    results = ga.run()
+
+    m = AmineCatalyst()
+
+    results= []
+    #results = ga.run()
 
 
 
@@ -645,6 +669,10 @@ if __name__ == "__main__":
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
+    con = sqlite3.connect("organic.sqlite")
+    cursor = con.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    print(cursor.fetchall())
     GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], comp_options)
 
     # fig, ax = plt.subplots()
