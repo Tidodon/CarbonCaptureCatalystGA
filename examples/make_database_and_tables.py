@@ -69,9 +69,9 @@ def empty_dbs(connector):
    connector.execute("DELETE FROM reactants")
    connector.execute("DELETE FROM miscs")
 
-#empty_dbs(c)
+empty_dbs(c)
 
-c.execute("SELECT * FROM reactants")
+c.execute("SELECT * FROM products")
 print("Miscs column names: ", [desc[0] for desc in c.description])
 v = c.fetchall() # TUPLE object, where each element corresponds to column
 for val in v:
