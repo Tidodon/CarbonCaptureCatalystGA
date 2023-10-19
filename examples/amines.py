@@ -384,6 +384,7 @@ class AmineCatalyst:
             ################################################
             amine_products_all = self.compute_amine_products(n_cores=n_cores)
             ################################################
+            
 
             ### Just for information -> If it gets shown often I will need to introduce more product id's
             if len(amine_products_all) > 3:
@@ -393,9 +394,6 @@ class AmineCatalyst:
                 prods.append(prod)
             results_dict["products"] = prods
             
-
-
-
         def get_dH (e_prod):
 
             products = e_prod + OCOO_energy
@@ -590,7 +588,15 @@ class GraphGA(GA):
     def add_computed_pops_to_db(self,):
         
         conn = sqlite3.connect('molecules_data.db')
-        c = conn.cursor()
+        def chk_conn(conn):
+            try:
+                conn.cursor()
+                return True
+            except Exception as ex:
+                return False
+            
+        print("Did connection to database succeed? :", chk_conn(conn))
+
         prod_id_col_names = ["product_1_id","product_2_id","product_3_id"]
         method, solvation = self.population[0].options["method"], self.population[0].options["solvation"]
         for individual in self.population:
@@ -690,14 +696,14 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    # m = AmineCatalyst(Chem.MolFromSmiles("NCCO"))
-    # m.options = comp_options
-    # m.program = comp_program
-    # m.calculate_score()
-    # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
+    m = AmineCatalyst(Chem.MolFromSmiles("NCCN"))
+    m.options = comp_options
+    m.program = comp_program
+    m.calculate_score()
+    print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
 
     #results= []
-    results = ga.run()
+    #results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
