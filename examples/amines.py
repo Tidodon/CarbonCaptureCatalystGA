@@ -261,6 +261,14 @@ class AmineCatalyst:
             ter_cats = []
         print("Inside compute products: ", pri_cats, sec_cats, ter_cats)
         return pri_cats + sec_cats + ter_cats
+    
+    @staticmethod
+    def chk_conn(conn):
+        try:
+            conn.cursor()
+            return True
+        except Exception as ex:
+            return False
         
     def calculate_score(
         self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
@@ -304,6 +312,7 @@ class AmineCatalyst:
         prod_ids = [None for _ in range(3)]
 
         conn = sqlite3.connect('molecules_data.db')
+        print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
         
@@ -550,6 +559,7 @@ class GraphGA(GA):
             return ind
         except Exception:
             return None
+        
 
     def run(self):
         results = []  # here the best individuals of each generation will be stored
@@ -585,17 +595,13 @@ class GraphGA(GA):
         
         return results
     
+
+    
     def add_computed_pops_to_db(self,):
         
         conn = sqlite3.connect('molecules_data.db')
-        def chk_conn(conn):
-            try:
-                conn.cursor()
-                return True
-            except Exception as ex:
-                return False
-            
-        print("Did connection to database succeed? :", chk_conn(conn))
+        
+        print("Did connection to database in ga.add_individuals succeed? :", AmineCatalyst.chk_conn(conn))
 
         prod_id_col_names = ["product_1_id","product_2_id","product_3_id"]
         method, solvation = self.population[0].options["method"], self.population[0].options["solvation"]
