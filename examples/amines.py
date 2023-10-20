@@ -319,9 +319,9 @@ class AmineCatalyst:
         product_1_id, product_2_id, product_3_id = None, None, None
         prods = []#None for _ in range(3)]## Hardcoded number of possible products.
         prod_ids = [None for _ in range(3)]
-
-        #conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
-        conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
+        
+        conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
+        #conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
         print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
@@ -660,14 +660,14 @@ class GraphGA(GA):
         for individual in self.population:
             if bool(individual.results) == False:
                 continue
-            if individual.results.has_key("miscs"):
+            if "miscs" in individual.results.keys():
 
                 for misc in individual.results["miscs"]:
                     misc_name, misc_energy= misc[0], misc[1]
                     params = (misc_name, method, solvation, misc_energy)
                     c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
 
-            if individual.results.has_key("reactant"):
+            if "reactant" in individual.results.keys():
 
                 reactant_smiles, reactant_energy = Chem.MolToSmiles(individual.mol) ,individual.results["reactant"]
                 c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
@@ -677,9 +677,9 @@ class GraphGA(GA):
             else:
                 rea_id = None
 
-            if individual.results.has_key("products"):
+            if "products" in individual.results.keys():
 
-                assert individual.results.has_key("reactant"),  "Products cannot be inserted if reactant was not."
+                assert "reactant" in individual.results.keys(),  "Products cannot be inserted if reactant was not."
                 amine_products = individual.results["products"]
                 prod_ids = []
                 prod_id_col_names = prod_id_col_names[:len(amine_products)]

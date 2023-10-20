@@ -5,37 +5,43 @@ conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonC
 #conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
 c = conn.cursor()
 
-# c.execute("""CREATE TABLE reactants(
-#         id INTEGER PRIMARY KEY,
-#        smiles text, 
-#         method text,
-#         solvation text,
-#         energy real
-# )""")
-# c.execute("""CREATE TABLE miscs(
-#         smiles text, 
-#         method text,
-#         solvation text,
-#         energy real
-# )""")
-# c.execute("""CREATE TABLE products(
-#           id INTEGER PRIMARY KEY,
-#           smiles text,
-#           method text,
-#           solvation text,
-#           energy real DEFAULT NULL,
-#           dH real DEFAULT NULL,
-#           k1 real DEFAULT NULL,
-#           k2 real DEFAULT NULL,
-#           k3 real DEFAULT NULL,
-#           reactant_id integer REFERENCES reactants(rowid) ON UPDATE CASCADE
-#          )""")
 
-# c.execute("ALTER TABLE reactants ADD product_1_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
-# c.execute("ALTER TABLE reactants ADD product_2_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
-# c.execute("ALTER TABLE reactants ADD product_3_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
-# c.execute("ALTER TABLE reactants ADD comments text")
-# c.execute("ALTER TABLE products ADD comments text")
+
+
+
+def build_database(c):
+   c.execute("""CREATE TABLE reactants(
+        id INTEGER PRIMARY KEY,
+       smiles text, 
+        method text,
+        solvation text,
+        energy real
+   )""")
+   c.execute("""CREATE TABLE miscs(
+        smiles text, 
+        method text,
+        solvation text,
+        energy real
+   )""")
+   c.execute("""CREATE TABLE products(
+          id INTEGER PRIMARY KEY,
+          smiles text,
+          method text,
+          solvation text,
+          energy real DEFAULT NULL,
+          dH real DEFAULT NULL,
+          k1 real DEFAULT NULL,
+          k2 real DEFAULT NULL,
+          k3 real DEFAULT NULL,
+          reactant_id integer REFERENCES reactants(rowid) ON UPDATE CASCADE
+         )""")
+   c.execute("ALTER TABLE reactants ADD product_1_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
+   c.execute("ALTER TABLE reactants ADD product_2_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
+   c.execute("ALTER TABLE reactants ADD product_3_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
+   c.execute("ALTER TABLE reactants ADD comments text")
+   c.execute("ALTER TABLE products ADD comments text")
+   
+#build_database(c)
 
 
 # # many_reactants = [ ('O','gfn2','gbsa','-5.080122224999'),
