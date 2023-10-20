@@ -1,8 +1,8 @@
 import sqlite3
 
 
-#conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db')
-conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
+conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db')
+#conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
 c = conn.cursor()
 
 # c.execute("""CREATE TABLE reactants(
@@ -70,19 +70,19 @@ def empty_dbs(connector):
    connector.execute("DELETE FROM reactants")
    connector.execute("DELETE FROM miscs")
 
-#empty_dbs(c)
+empty_dbs(c)
 
-c.execute("SELECT * FROM products")
+c.execute("SELECT * FROM miscs")
 print("Miscs column names: ", [desc[0] for desc in c.description])
 v = c.fetchall() # TUPLE object, where each element corresponds to column
 for val in v:
    print(val)
-# c.execute("SELECT * FROM products")
-# print("Miscs column names: ", [desc[0] for desc in c.description])
-# v = c.fetchall() # TUPLE object, where each element corresponds to column
-# for val in v:
-    
-#    print(val)
+
+c.execute("SELECT * FROM products")
+print("Products column names: ", [desc[0] for desc in c.description])
+v = c.fetchall() # TUPLE object, where each element corresponds to column
+for val in v:
+    print(val)
 # for val in v:
 #    print(val)
 
