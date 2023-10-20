@@ -319,7 +319,7 @@ class AmineCatalyst:
         product_1_id, product_2_id, product_3_id = None, None, None
         prods = []#None for _ in range(3)]## Hardcoded number of possible products.
         prod_ids = [None for _ in range(3)]
-        
+
         conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
         #conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
         print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
@@ -663,7 +663,7 @@ class GraphGA(GA):
             if "miscs" in individual.results.keys():
 
                 for misc in individual.results["miscs"]:
-                    misc_name, misc_energy= misc[0], misc[1]
+                    misc_name, misc_energy= Chem.MolToSmiles(misc[0].mol), misc[1]
                     params = (misc_name, method, solvation, misc_energy)
                     c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
 
