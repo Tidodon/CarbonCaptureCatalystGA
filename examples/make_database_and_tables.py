@@ -1,8 +1,8 @@
 import sqlite3
 
 
-conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
-#conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
+#conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
+conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
 c = conn.cursor()
 
 
@@ -76,7 +76,7 @@ def empty_dbs(connector):
    connector.execute("DELETE FROM reactants")
    connector.execute("DELETE FROM miscs")
 
-empty_dbs(c)
+# empty_dbs(c)
 
 c.execute("SELECT * FROM miscs")
 print("Miscs column names: ", [desc[0] for desc in c.description])

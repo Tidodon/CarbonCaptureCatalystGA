@@ -687,7 +687,7 @@ class GraphGA(GA):
                     c.execute("INSERT INTO products(smiles,method,solvation, energy, dH, reactant_id) VALUES(?,?,?,?,?,?)", (amine_product[0], method, solvation, amine_product[1], individual.dHabs[1], rea_id))
                     c.execute("SELECT id FROM products WHERE smiles=? AND method=? AND solvation=?", (amine_product[0], method, solvation))
                     prod_am = int(c.fetchone()[0])
-                    prod_ids.append(prod_am[0])
+                    prod_ids.append(prod_am)
                     query = f'UPDATE reactants SET {prod_id_col_name}=? WHERE id=?'
                     # print("Check query: ", query)
                     c.execute(query, ([prod_am, rea_id]))
