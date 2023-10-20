@@ -233,8 +233,12 @@ class AmineCatalyst:
         self.mol = Chem.MolFromSmiles(Chem.MolToSmiles(self.mol))
         # Replacement step. It is dependenent on the whether the molecule was sanitized or not.
         print("Check recognition: ", Chem.MolToSmiles(self.mol),Chem.MolToSmarts(patt),Chem.MolToSmiles(repl))
-        products = Chem.rdmolops.ReplaceSubstructs(mol=self.mol, query=patt, replacement=repl)
 
+        products = Chem.rdmolops.ReplaceSubstructs(mol=self.mol, query=patt, replacement=repl)
+        
+        products = [Chem.MolFromSmiles(m) for m in set([Chem.MolToSmiles(p) for p in products])]
+
+        print("products in cat_products: ", [Chem.MolToSmiles(p) for p in products])
         for prod in products:
             print("Check products ",Chem.MolToSmiles(prod))
             cat = AmineCatalyst(prod)
@@ -447,7 +451,7 @@ class AmineCatalyst:
         #Assign score values based on dH, k, SA
 
         #dH scorings alone.
-        self.score = self.dHabs
+        self.score = self.dHabs[1]
 
         #c.execute("DELETE FROM products")
         #c.execute("DELETE FROM reactants")
@@ -600,6 +604,7 @@ class GraphGA(GA):
     def add_computed_pops_to_db(self,):
         
         conn = sqlite3.connect('molecules_data.db')
+        c = conn.cursor()
         
         print("Did connection to database in ga.add_individuals succeed? :", AmineCatalyst.chk_conn(conn))
 
@@ -708,7 +713,7 @@ if __name__ == "__main__":
     m.calculate_score()
     print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
 
-    #results= []
+    results= []
     #results = ga.run()
 
     ##########################################################
