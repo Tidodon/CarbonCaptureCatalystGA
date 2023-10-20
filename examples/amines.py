@@ -320,8 +320,8 @@ class AmineCatalyst:
         prods = []#None for _ in range(3)]## Hardcoded number of possible products.
         prod_ids = [None for _ in range(3)]
 
-        conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
-
+        #conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
+        conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
         print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
@@ -445,7 +445,7 @@ class AmineCatalyst:
         print( reactant_energy, " -> ", amine_product[1])
 
         self.results = results_dict
-
+        print("Results dict: ", self.results)
         #results_list = [[reactant_energy], [ ]for prod in prods]
 
 
@@ -647,6 +647,7 @@ class GraphGA(GA):
 
     
     def add_computed_pops_to_db(self,):
+
         conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
 
         #conn = sqlite3.connect('molecules_data.db')
@@ -657,15 +658,17 @@ class GraphGA(GA):
         prod_id_col_names = ["product_1_id","product_2_id","product_3_id"]
         method, solvation = self.population[0].options["method"], self.population[0].options["solvation"]
         for individual in self.population:
-            if bool(individual.results):
+            if bool(individual.results) == False:
                 continue
             if individual.results.has_key("miscs"):
+
                 for misc in individual.results["miscs"]:
                     misc_name, misc_energy= misc[0], misc[1]
                     params = (misc_name, method, solvation, misc_energy)
                     c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
 
             if individual.results.has_key("reactant"):
+
                 reactant_smiles, reactant_energy = Chem.MolToSmiles(individual.mol) ,individual.results["reactant"]
                 c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
                 c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
@@ -675,6 +678,7 @@ class GraphGA(GA):
                 rea_id = None
 
             if individual.results.has_key("products"):
+
                 assert individual.results.has_key("reactant"),  "Products cannot be inserted if reactant was not."
                 amine_products = individual.results["products"]
                 prod_ids = []
@@ -753,12 +757,11 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("CCCCCCCCCCCCNCCO"))
+    m = AmineCatalyst(Chem.MolFromSmiles("NCCO"))
     m.options = comp_options
     m.program = comp_program
     m.calculate_score()
     print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
-
     results= []
     #results = ga.run()
 
