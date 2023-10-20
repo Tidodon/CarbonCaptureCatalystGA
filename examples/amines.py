@@ -5,6 +5,7 @@ from rdkit.Chem import Descriptors
 from rdkit.Chem import Draw
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import IPythonConsole
+from rdkit.ML.Cluster import Butina
 import copy
 import sys
 sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
@@ -155,8 +156,12 @@ class AmineCatalyst:
                         #randomSeed=5
                     )
         
+        nconfs = sum([1 for _ in self.mol.GetConformers()])
+        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {nconfs}.")
         ################## Force field optimize conformers. ##################
 
+
+        
         #AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
 
         ######################################################################
@@ -183,7 +188,7 @@ class AmineCatalyst:
             except:
                 charge = 0
             orca_options = self.prepare_orca_options()
-            print("XTB options: ", xtb_options)
+            print("orca options: ", orca_options)
             #### Prepare orca output to same format as xtb output:
             try:
                 return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
@@ -315,7 +320,8 @@ class AmineCatalyst:
         prods = []#None for _ in range(3)]## Hardcoded number of possible products.
         prod_ids = [None for _ in range(3)]
 
-        conn = sqlite3.connect('molecules_data.db')
+        conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
+
         print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
@@ -641,8 +647,9 @@ class GraphGA(GA):
 
     
     def add_computed_pops_to_db(self,):
-        
-        conn = sqlite3.connect('molecules_data.db')
+        conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
+
+        #conn = sqlite3.connect('molecules_data.db')
         c = conn.cursor()
         
         print("Did connection to database in ga.add_individuals succeed? :", AmineCatalyst.chk_conn(conn))
@@ -746,7 +753,7 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("NCCN"))
+    m = AmineCatalyst(Chem.MolFromSmiles("CCCCCCCCCCCCNCCO"))
     m.options = comp_options
     m.program = comp_program
     m.calculate_score()
