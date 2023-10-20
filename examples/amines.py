@@ -235,7 +235,7 @@ class AmineCatalyst:
         print("Check recognition: ", Chem.MolToSmiles(self.mol),Chem.MolToSmarts(patt),Chem.MolToSmiles(repl))
 
         products = Chem.rdmolops.ReplaceSubstructs(mol=self.mol, query=patt, replacement=repl)
-        
+
         products = [Chem.MolFromSmiles(m) for m in set([Chem.MolToSmiles(p) for p in products])]
 
         print("products in cat_products: ", [Chem.MolToSmiles(p) for p in products])
@@ -492,8 +492,6 @@ class AmineCatalyst:
 
         # print("Product smiles: ",  [val[0] for val in amine_products_all])
 
-
-
         ####Later a reordering code will be added here.
 
         #order_amine_products(dH, dG) -> top three most reactive. 
@@ -570,6 +568,21 @@ class GraphGA(GA):
         self.print_parameters()
         
         self.population = self.make_initial_population()
+
+
+        #### Check for miscs & eventually compute them here.
+
+        ### 3 functions here.
+
+        ####:CHECKER FUNCTION
+        #if self.check_for_misc_mols():
+        #    pass#Compute miscs -> Computes them on frontend... -> How to send them to Steno for this step?
+
+
+        ### IF TRUE -> compute miscs -> output a dict
+
+        ### save to db.
+        ####
         print("Population in run: ", self.population)
         self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
@@ -599,6 +612,32 @@ class GraphGA(GA):
         
         return results
     
+    # def check_for_misc_mols(self):
+    #     """
+    #     Use this checker after self.population has been initialized.
+    #     """
+
+    #     conn = sqlite3.connect('molecules_data.db')
+    #     c = conn.cursor()
+    #     method, solvation = self.population[0].options["method"], self.population[0].options["solvation"]
+
+    #     check = False
+    #     c.execute("SELECT smiles, energy FROM miscs WHERE method=? AND solvation=?", (method, solvation))
+    #     result = c.fetchone()
+
+    #     if result is None:
+    #         check = True
+
+    #     conn.commit()
+    #     conn.close()
+
+    #     return check
+        
+    # def compute_misc_mols(self,):
+    #     pass
+    
+    # def insert_misc_mols(self,):
+    #     pass
 
     
     def add_computed_pops_to_db(self,):
@@ -693,7 +732,7 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}
+    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
 
 
     ga = GraphGA(
