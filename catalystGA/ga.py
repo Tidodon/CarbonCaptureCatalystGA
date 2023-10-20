@@ -57,7 +57,7 @@ class GA(ABC):
     @abstractmethod
     def mutate(ind):
         pass
-
+    
     def health_check(self):
         """Checks if methods `calculate_score` and `__eq__` are implemented in
         the individual class.
@@ -83,7 +83,6 @@ class GA(ABC):
         Returns:
             population: List of individuals with scores
         """
-
         def _wrap_scoring(individual, n_cores, envvar_scratch, scoring_kwargs):
             print(f"Scoring individual {individual.idx}")
             print(f"Scoring args: {scoring_kwargs}")
@@ -123,6 +122,8 @@ class GA(ABC):
                 cat.error = error
             new_population.append(cat)
         population = new_population
+        for pop in population:
+            print("Scores inside ga.py: ", pop.score)
 
         self.sort_population(population, self.maximize_score)
 
