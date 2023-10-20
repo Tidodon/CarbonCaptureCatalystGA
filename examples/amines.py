@@ -684,7 +684,7 @@ class GraphGA(GA):
                 prod_ids = []
                 prod_id_col_names = prod_id_col_names[:len(amine_products)]
                 for amine_product, prod_id_col_name in zip(amine_products, prod_id_col_names) :
-                    c.execute("INSERT INTO products(smiles,method,solvation, energy, dH, reactant_id) VALUES(?,?,?,?,?,?)", (amine_product[0], method, solvation, amine_product[1], individual.dHabs, rea_id))
+                    c.execute("INSERT INTO products(smiles,method,solvation, energy, dH, reactant_id) VALUES(?,?,?,?,?,?)", (amine_product[0], method, solvation, amine_product[1], individual.dHabs[1], rea_id))
                     c.execute("SELECT id FROM products WHERE smiles=? AND method=? AND solvation=?", (amine_product[0], method, solvation))
                     prod_am = int(c.fetchone()[0])
                     prod_ids.append(prod_am[0])
@@ -757,13 +757,13 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("NCCO"))
-    m.options = comp_options
-    m.program = comp_program
-    m.calculate_score()
-    print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
-    results= []
-    #results = ga.run()
+    # m = AmineCatalyst(Chem.MolFromSmiles("NCCO"))
+    # m.options = comp_options
+    # m.program = comp_program
+    # m.calculate_score()
+    # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
+    # results= []
+    results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
