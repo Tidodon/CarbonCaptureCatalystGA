@@ -155,14 +155,30 @@ class AmineCatalyst:
                         #randomSeed=5
                     )
         
-        AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
+        optimized_confs = AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
+
+
+        ##### Conformer pruning based on whether optimization converged and energy magnitude.
+        num_confs = self.mol.GetNumConformers()
+
+        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {num_confs}.")
+
+        min_e_conf = min([optimized_confs[i][1] for i in range(num_confs)])
+        print("MINECONF",min_e_conf)
+        for i in range(num_confs-1, -1, -1):
+            print(optimized_confs[i])
+            if  bool(optimized_confs[i][0]):
+                self.mol.RemoveConformer(i)
+            elif (optimized_confs[i][1] - min_e_conf) > 10:
+                print((optimized_confs[i][1] - min_e_conf))
+                self.mol.RemoveConformer(i)
+
+        num_confs = self.mol.GetNumConformers()
+        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {num_confs}.")
 
 
 
         # Cluster conformers
-        num_confs = self.mol.GetNumConformers()
-
-        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {num_confs}.")
         # diffmat = AllChem.GetConformerRMSMatrix(self.mol, prealigned=False)
         # clt = Butina.ClusterData(diffmat, num_confs, distThresh=0.05,
         #                      isDistData=True, reordering=True)
@@ -217,9 +233,11 @@ class AmineCatalyst:
             submols = mol_name.split(".")
             tot_e = 0
             for submol in submols:
+                print("SUBMOL: " , submol)
                 sub = AmineCatalyst(Chem.MolFromSmiles(submol))
                 charge = Chem.rdmolops.GetFormalCharge(sub.mol)
                 sub.program, sub.options = self.program, self.options
+                sub.options["charge"] = charge
                 confs = sub.calculate_energy(n_cores=n_cores, charge=charge)
                 tot_e += sub.weight_energy(confs)
             return tot_e
@@ -747,7 +765,7 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water", "charge":1}
 
 
     ga = GraphGA(
@@ -761,11 +779,13 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("CCCCCCCCCCCCNCCO"))
+    m = AmineCatalyst(Chem.MolFromSmiles("[Na+]"))
     m.options = comp_options
     m.program = comp_program
-    m.calculate_score()
+    res = m.calculate_energy(n_cores=1)
+    
     print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
+    print(res)
     results= []
     #results = ga.run()
 
@@ -776,7 +796,7 @@ if __name__ == "__main__":
     for molecule in results:
         print("molecuel: ", Chem.MolToSmiles(molecule.mol))
         calc_names.append(Chem.MolToSmiles(molecule.mol))
-        calc_dH.append(molecule.dHabs)
+        calc_dH.append(molecule.dHabs[1])
     ##########################################################
 
 
