@@ -156,13 +156,30 @@ class AmineCatalyst:
                         #randomSeed=5
                     )
         
-        nconfs = sum([1 for _ in self.mol.GetConformers()])
-        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {nconfs}.")
+        AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
+
+        diffmat = AllChem.GetConformerRMSMatrix(self.mol, prealigned=False) #threshold=0.5, sanitize=False, load AllChem
+        # diffmat = TorsionFingerprints.GetTFDMatrix(rdkit_mol) #threshold=0.01, sanitize=True, load TorsionFingerprints
+
+
+        # Cluster conformers
+        num_confs = self.mol.GetNumConformers()
+
+        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {num_confs}.")
+
+        clt = Butina.ClusterData(diffmat, num_confs, threshold=0.5,
+                             isDistData=True, reordering=True)
+
+        # Get unique conformers
+        best_conformers =[ conformer for conformer in (self.mol).GetConformers()]
+        centroid_idx = [c[0] for c in clt] # centroid indexes
+        unique_best_conformers = [best_conformers[i] for i in centroid_idx]
+
+
         ################## Force field optimize conformers. ##################
 
-
         
-        #AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
+        
 
         ######################################################################
 
@@ -175,7 +192,7 @@ class AmineCatalyst:
             xtb_options["charge"] = charge
             print("XTB options: ", xtb_options)
             try:
-                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
+                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in unique_best_conformers]
                 return res
             except:
                 print("Incorrect termination of XTB.")
@@ -193,7 +210,7 @@ class AmineCatalyst:
             try:
                 return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
             except:
-                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
+                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in unique_best_conformers]
                 print("Incorrect termination of Orca. -> atoms/opt_coords/electronic_energy dict keys don't respond")
                 print(self.smiles, self.options, orca_options)
                 return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
@@ -392,7 +409,6 @@ class AmineCatalyst:
             results_dict["miscs"] = miscs_lst
                 
 
-
         if compute_reactant:
             reactant_energy = self.compute_and_weight_energy(n_cores=n_cores, charge=0)
             print("inside except reactant energy: ", reactant_energy)
@@ -441,8 +457,8 @@ class AmineCatalyst:
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
         
-        print( reactant_smiles, " -> ", amine_product[0])
-        print( reactant_energy, " -> ", amine_product[1])
+        print( reactant_smiles, " -> ", amine_product[0] )
+        print( reactant_energy, " -> ", amine_product[1] )
 
         self.results = results_dict
         print("Results dict: ", self.results)
