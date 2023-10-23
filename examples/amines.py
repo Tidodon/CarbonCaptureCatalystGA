@@ -221,7 +221,7 @@ class AmineCatalyst:
         mv = min([v[2] for v in confs])
         boltz_exponents = [(val[2]-mv)/(self.K_B * self.T_K) for val in confs ]
         boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
-        return sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
+        return mv#sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
         
     def compute_and_weight_energy(self, n_cores, charge):
         mol_name = Chem.MolToSmiles(self.mol)
