@@ -20,7 +20,6 @@ from orca import orca_calculate
 import sqlite3
 
 #### TODOS:
-#### - Remove hardcoded temperature
 #### - Intermediate naming for prim/seco/tert amines in the scoring function
 #### - dH scoring for A.B ionic compounds. Retrieve reactant data to compute.
 #### - Deal with possible duplicates in DB: non-exact but similar namings, two rows with identical methods used but different energies.
@@ -148,42 +147,31 @@ class AmineCatalyst:
         print("Name of mol:", Chem.MolToSmiles(self.mol))
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
                         self.mol,
-                        # clearConfs=True,
+                        clearConfs=True,
                         # maxAttempts = 10,
-                        numConfs=2000,
+                        numConfs=500,
                         useRandomCoords=True,
-                        pruneRmsThresh=0.1,
+                        pruneRmsThresh=1.0,
                         #randomSeed=5
                     )
         
         AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
 
-        diffmat = AllChem.GetConformerRMSMatrix(self.mol, prealigned=False) #threshold=0.5, sanitize=False, load AllChem
-        # diffmat = TorsionFingerprints.GetTFDMatrix(rdkit_mol) #threshold=0.01, sanitize=True, load TorsionFingerprints
 
 
         # Cluster conformers
         num_confs = self.mol.GetNumConformers()
 
         print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {num_confs}.")
-
-        clt = Butina.ClusterData(diffmat, num_confs, threshold=0.5,
-                             isDistData=True, reordering=True)
-
-        # Get unique conformers
-        best_conformers =[ conformer for conformer in (self.mol).GetConformers()]
-        centroid_idx = [c[0] for c in clt] # centroid indexes
-        unique_best_conformers = [best_conformers[i] for i in centroid_idx]
-
-
-        ################## Force field optimize conformers. ##################
-
-        
-        
-
-        ######################################################################
-
-
+        # diffmat = AllChem.GetConformerRMSMatrix(self.mol, prealigned=False)
+        # clt = Butina.ClusterData(diffmat, num_confs, distThresh=0.05,
+        #                      isDistData=True, reordering=True)
+        # # Get unique conformers
+        # best_conformers =[ conformer for conformer in (self.mol).GetConformers()]
+        # centroid_idx = [c[0] for c in clt] # centroid indexes
+        # print(f"Centroids for clustering are {centroid_idx}")
+        # unique_best_conformers = [best_conformers[i] for i in centroid_idx]
+        # print( f"Number of conformers of {Chem.MolToSmiles(self.mol)} post cluster pruning is {len(unique_best_conformers)}.")
         atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
         
         if self.program =="xtb":
@@ -192,7 +180,7 @@ class AmineCatalyst:
             xtb_options["charge"] = charge
             print("XTB options: ", xtb_options)
             try:
-                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in unique_best_conformers]
+                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
                 return res
             except:
                 print("Incorrect termination of XTB.")
@@ -210,7 +198,7 @@ class AmineCatalyst:
             try:
                 return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
             except:
-                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in unique_best_conformers]
+                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
                 print("Incorrect termination of Orca. -> atoms/opt_coords/electronic_energy dict keys don't respond")
                 print(self.smiles, self.options, orca_options)
                 return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
@@ -337,8 +325,8 @@ class AmineCatalyst:
         prods = []#None for _ in range(3)]## Hardcoded number of possible products.
         prod_ids = [None for _ in range(3)]
 
-        conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
-        #conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
+        #conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
+        conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
         print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
@@ -773,13 +761,13 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    # m = AmineCatalyst(Chem.MolFromSmiles("NCCO"))
-    # m.options = comp_options
-    # m.program = comp_program
-    # m.calculate_score()
-    # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
-    # results= []
-    results = ga.run()
+    m = AmineCatalyst(Chem.MolFromSmiles("CCCCCCCCCCCCNCCO"))
+    m.options = comp_options
+    m.program = comp_program
+    m.calculate_score()
+    print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
+    results= []
+    #results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
