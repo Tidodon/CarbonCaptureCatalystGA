@@ -44,7 +44,7 @@ class AmineCatalyst:
     def __init__(self, mol: Chem.Mol) -> None:
         self.mol       = mol
         self.program   = "xtb" # orca or xtb 
-        self.options   = {} # Specify method , solvation, opt, charge, solvent. Depending on program those will be reshaped.
+        self.options   = {} # Specify method , solvation, opt, solvent. Depending on program those will be reshaped.
         self.score     = math.nan
         self.fitness   = math.nan
         self.timing    = math.nan
@@ -111,10 +111,10 @@ class AmineCatalyst:
         except:
             print("Unspecified optimization")
 
-        try:
-            xtb_options["charge"] = self.options["charge"]
-        except:
-            print("Unspecified charge")
+        # try:
+        #     xtb_options["charge"] = self.options["charge"]
+        # except:
+        #     print("Unspecified charge")
 
         return xtb_options #
     
@@ -139,7 +139,7 @@ class AmineCatalyst:
         orca_options = {options_string:""}
         return orca_options
     
-    def calculate_energy(self, n_cores, charge=0):
+    def calculate_energy(self, n_cores):
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
 
@@ -193,7 +193,10 @@ class AmineCatalyst:
         if self.program =="xtb":
             xtb_options = self.prepare_xtb_options()
             print("self options: ", self.options)
-            xtb_options["charge"] = charge
+            try:
+                xtb_options["charge"] =  self.options.pop("charge")
+            except:
+                xtb_options["charge"] = Chem.rdmolops.GetFormalCharge(self.mol)
             print("XTB options: ", xtb_options)
             try:
                 res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
@@ -204,10 +207,11 @@ class AmineCatalyst:
                 return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
 
         elif self.program == "orca":
-            try:
+            charge=0
+            try: 
                 charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
             except:
-                charge = 0
+                charge = Chem.rdmolops.GetFormalCharge(self.mol)#0
             orca_options = self.prepare_orca_options()
             print("orca options: ", orca_options)
             #### Prepare orca output to same format as xtb output:
@@ -227,7 +231,7 @@ class AmineCatalyst:
         boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
         return mv#sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
         
-    def compute_and_weight_energy(self, n_cores, charge):
+    def compute_and_weight_energy(self, n_cores):
         mol_name = Chem.MolToSmiles(self.mol)
         if "." in mol_name:
             submols = mol_name.split(".")
@@ -235,14 +239,12 @@ class AmineCatalyst:
             for submol in submols:
                 print("SUBMOL: " , submol)
                 sub = AmineCatalyst(Chem.MolFromSmiles(submol))
-                charge = Chem.rdmolops.GetFormalCharge(sub.mol)
                 sub.program, sub.options = self.program, self.options
-                sub.options["charge"] = charge
-                confs = sub.calculate_energy(n_cores=n_cores, charge=charge)
+                confs = sub.calculate_energy(n_cores=n_cores)
                 tot_e += sub.weight_energy(confs)
             return tot_e
         else:
-            confs = self.calculate_energy(n_cores=n_cores, charge=charge)
+            confs = self.calculate_energy(n_cores=n_cores)
             return self.weight_energy(confs)
 
     def cat_products(self, patt, repl, n_cores):
@@ -273,8 +275,7 @@ class AmineCatalyst:
             cat.options = self.options
             cat.program = self.program
                     
-
-            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy( n_cores=n_cores, charge=1)]
+            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy(n_cores=n_cores)]
 
     def compute_amine_products(self, n_cores):
         if self.amine_type[0]: # If mol has primary amine
@@ -395,14 +396,13 @@ class AmineCatalyst:
             print("Miscallenous molecules not in database. Computing and adding to database now...")
             miscs_lst =[]
             for name in [CO2_smiles, H2O_smiles, OCOO_smiles]:
-                charge = 0
-                if name == OCOO_smiles:
-                    charge = -1
-                
+                # charge = 0
+                # if name == OCOO_smiles:
+                #     charge = -1
                 name_mol         = AmineCatalyst(Chem.MolFromSmiles(name))
                 name_mol.options = self.options
                 print("name_mol options: ", name_mol.options)
-                name_energy      = name_mol.compute_and_weight_energy(n_cores=n_cores, charge=charge)#name_mol.weight_energy(confs_e)
+                name_energy      = name_mol.compute_and_weight_energy(n_cores=n_cores)#name_mol.weight_energy(confs_e)
 
                 #### Temporary ugly block for misc energy values.
                 if name == CO2_smiles:
@@ -416,7 +416,7 @@ class AmineCatalyst:
                 
 
         if compute_reactant:
-            reactant_energy = self.compute_and_weight_energy(n_cores=n_cores, charge=0)
+            reactant_energy = self.compute_and_weight_energy(n_cores=n_cores)
             print("inside except reactant energy: ", reactant_energy)
             results_dict["reactant"] = reactant_energy
 
@@ -765,7 +765,7 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water", "charge":1}
+    comp_options = {"method":"gfn_2", "solvation":"alpb", "solvent":"water"}
 
 
     ga = GraphGA(
@@ -779,13 +779,13 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("[Na+]"))
+    m = AmineCatalyst(Chem.MolFromSmiles("[Na+].NCC([O-])=O"))
     m.options = comp_options
     m.program = comp_program
-    res = m.calculate_energy(n_cores=1)
+    m.calculate_score()
     
     print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
-    print(res)
+    #print(res)
     results= []
     #results = ga.run()
 
