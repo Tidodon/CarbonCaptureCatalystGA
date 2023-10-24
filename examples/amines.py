@@ -464,7 +464,7 @@ class AmineCatalyst:
                     print("This is None: ", ele_name, ele)
 
             amine_product_name = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
-            dHs.append([amine_product_name, AmineCatalyst.hartree_to_kcalmol(get_dH(amine_product[1]))])
+            dHs.append([amine_product_name, AmineCatalyst.hartree_to_kjmol(get_dH(amine_product[1]))])
 
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
