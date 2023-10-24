@@ -111,10 +111,10 @@ class AmineCatalyst:
         except:
             print("Unspecified optimization")
 
-        # try:
-        #     xtb_options["charge"] = self.options["charge"]
-        # except:
-        #     print("Unspecified charge")
+        try:
+            xtb_options["charge"] = self.options["charge"]
+        except:
+            print("Unspecified charge")
 
         return xtb_options #
     
@@ -242,7 +242,10 @@ class AmineCatalyst:
             for submol in submols:
                 print("SUBMOL: " , submol)
                 sub = AmineCatalyst(Chem.MolFromSmiles(submol))
-                sub.program, sub.options = self.program, self.options
+                sub.program, sub.options = self.program, copy.copy(self.options)
+                if Chem.MolFromSmiles(submol).GetNumAtoms() ==1 :
+                    print("SUBOPTIONS: ", submol, sub.options)
+                    _ = sub.options.pop("opt")
                 confs = sub.calculate_energy(n_cores=n_cores)
                 tot_e += sub.weight_energy(confs)
             return tot_e
@@ -768,7 +771,7 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "solvation":"alpb", "solvent":"water"}
+    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
 
 
     ga = GraphGA(
@@ -782,7 +785,7 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("[Na+].NCC([O-])=O"))
+    m = AmineCatalyst(Chem.MolFromSmiles("[K+].[O-]C(=O)[C@@H]1CCCN1"))#112.34863236070932
     m.options = comp_options
     m.program = comp_program
     m.calculate_score()
