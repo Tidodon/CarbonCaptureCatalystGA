@@ -47,10 +47,16 @@ def empty_dbs(cursor, *args):
       except:
          print(f"Table with name {arg} does not exist.")
          
-def print_table_contents(cursor, *args):
+def print_table_contents(cursor, *args, **kwargs):
    for arg in args:
       try: 
          query= f"SELECT * FROM {arg}"
+         if len(kwargs) >0:
+            query += " WHERE "
+            for item in kwargs.items():
+               query += f"{item[0]}={item[1]} AND" 
+            query = query[:-4]
+
          cursor.execute(query)
          print(f"{arg} column names: ", [desc[0] for desc in cursor.description])
          v = cursor.fetchall()
@@ -63,7 +69,7 @@ def print_table_contents(cursor, *args):
 ###Code to get column names:
 #build_database(c, name1,name2)
 # empty_dbs(c)
-print_table_contents(c, "miscs", "reactants", "products")
+print_table_contents(c, "miscs", "reactants", "products", method="gfn_2", solvation="gbsa")
 
 
 
