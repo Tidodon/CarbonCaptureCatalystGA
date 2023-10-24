@@ -63,26 +63,7 @@ def print_table_contents(cursor, *args):
 ###Code to get column names:
 #build_database(c, name1,name2)
 # empty_dbs(c)
-
-
-
-
-c.execute("SELECT * FROM miscs")
-print("Miscs column names: ", [desc[0] for desc in c.description])
-v = c.fetchall() # TUPLE object, where each element corresponds to column
-for val in v:
-   print(val)
-
-c.execute("SELECT * FROM products")
-print("Products column names: ", [desc[0] for desc in c.description])
-v = c.fetchall() # TUPLE object, where each element corresponds to column
-for val in v:
-    print(val)
-# for val in v:
-#    print(val)
-
-# print("Product column names: ", [desc[0] for desc in c.description])
-#c.execute("DROP TABLE products")
+print_table_contents(c, "miscs", "reactants", "products")
 
 
 
