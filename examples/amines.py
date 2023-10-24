@@ -226,10 +226,13 @@ class AmineCatalyst:
             raise "Incorrect specification of the QM program."
     
     def weight_energy(self, confs):
-        mv = min([v[2] for v in confs])
-        boltz_exponents = [(val[2]-mv)/(self.K_B * self.T_K) for val in confs ]
+        # I pre-divide the exponent to get rid of the extraordinarly large exponents. Since all energies are enforced
+        # to be of the similar magnitude.
+        boltz_exponents = [((val[2]-confs[0][2]))/(self.K_B * self.T_K) for val in confs ]
+        print("BOLTZ exponents", boltz_exponents)
         boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
-        return mv#sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
+        print("Check normalization: ")
+        return sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
         
     def compute_and_weight_energy(self, n_cores):
         mol_name = Chem.MolToSmiles(self.mol)
