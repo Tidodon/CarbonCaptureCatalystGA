@@ -14,14 +14,10 @@ print(current_path=="/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCapt
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
     sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
     sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/catalystGA")
-    amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
-    database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
 
 elif current_path == "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
     sys.path.append("/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/catalystGA")
     sys.path.append("/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/")
-    amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
-    database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
 else:
     print("Path is different than testing or running environemnt")
     print("The path is: ", current_path)
@@ -686,12 +682,25 @@ class GraphGA(GA):
         plt.show()
         plt.close()
 
-if __name__ == "__main__":
-    import numpy as np
-    from scipy import stats
+if __name__ == "__main__": 
+    import numpy as np 
+    from scipy import stats 
     #import time
     import pandas as pd 
-    import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt 
+
+    ##Get paths to amines and database.
+    current_path = str(Path.cwd())
+    if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
+        amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
+    elif current_path == "lustre/hpc/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
+        amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
+    else:
+        print("Path is different than testing or running environemnt")
+        print("The path is: ", current_path)
+
 
 
     

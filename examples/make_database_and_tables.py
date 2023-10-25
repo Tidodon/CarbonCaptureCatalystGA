@@ -4,7 +4,7 @@ current_path = str(Path.cwd())
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
    database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
 
-elif current_path == "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
+elif current_path == "lustre/hpc/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
     database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
 else:
    print("Outside predefined working directories.")
