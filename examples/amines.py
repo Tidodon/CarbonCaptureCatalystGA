@@ -10,7 +10,6 @@ import copy
 import sys
 from pathlib import Path
 current_path = str(Path.cwd())
-print(current_path)
 print(current_path=="/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA")
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
     sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
@@ -175,11 +174,7 @@ class AmineCatalyst:
 
         ##### Conformer pruning based on whether optimization converged and energy magnitude.
         num_confs = self.mol.GetNumConformers()
-
-        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {num_confs}.")
-
         min_e_conf = min([optimized_confs[i][1] for i in range(num_confs)])
-        print("MINECONF",min_e_conf)
         for i in range(num_confs-1, -1, -1):
             print(optimized_confs[i])
             if  bool(optimized_confs[i][0]):
@@ -189,7 +184,6 @@ class AmineCatalyst:
                 self.mol.RemoveConformer(i)
 
         num_confs = self.mol.GetNumConformers()
-        print(f"Number of conformers for {Chem.MolToSmiles(self.mol)} is: {num_confs}.")
 
 
 
@@ -390,6 +384,7 @@ class AmineCatalyst:
             compute_miscs = True
 
         try: 
+            
             c.execute("SELECT id, energy, product_1_id, product_2_id, product_3_id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles,method, solvation))
             reacs_data  = c.fetchone() #
             rea_id, reactant_energy, product_1_id, product_2_id, product_3_id = reacs_data
@@ -397,6 +392,7 @@ class AmineCatalyst:
             print("Reactant recovery test: ", rea_id, reactant_energy, product_1_id, product_2_id, product_3_id)
             print("Successful unpacking of reactant row")
             ### If the data reading step fails compute the reactant value and insert it to database.
+
         except:
             compute_reactant = True
 
@@ -437,6 +433,7 @@ class AmineCatalyst:
                 
 
         if compute_reactant:
+            
             reactant_energy = self.compute_and_weight_energy(n_cores=n_cores)
             print("inside except reactant energy: ", reactant_energy)
             results_dict["reactant"] = reactant_energy
@@ -475,8 +472,8 @@ class AmineCatalyst:
 
             #####CHECK for correct computation and assigning of values.
             for ele, ele_name in zip(eles, ele_names):
-                if ele is None:
-                    print("This is None: ", ele_name, ele)
+                if ele is math.nan:
+                    print("This is NaN: ", ele_name, ele)
 
             amine_product_name = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
             dHs.append([amine_product_name, AmineCatalyst.hartree_to_kjmol(get_dH(amine_product[1]))])
@@ -491,8 +488,6 @@ class AmineCatalyst:
         print("Results dict: ", self.results)
         #results_list = [[reactant_energy], [ ]for prod in prods]
 
-
-        #product_energy = 0 # Compute for each possible product OR weight them by boltzmann
         # print("Reactant energy: ", self.weight_energy(reactant_confs))
 
         ### Decide on which product to use by k value:
@@ -501,45 +496,6 @@ class AmineCatalyst:
 
         #dH scorings alone.
         self.score = self.dHabs[1]
-
-        #c.execute("DELETE FROM products")
-        #c.execute("DELETE FROM reactants")
-        #c.execute("DELETE FROM miscs")
-
-        ######## INSERTIONS TO MOVE OTHERPLACE
-        #print("Miscs except: ", name, name_energy)
-
-        ########
-
-        # c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
-        # c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
-        # rea_id = int(c.fetchone()[0])
-        # rea_id, reactant_energy, product_1_id, product_2_id, product_3_id
-
-        # c.execute("INSERT INTO products(smiles,method,solvation, energy, dH, reactant_id) VALUES(?,?,?,?,?,?)", (amine_product[0], method, solvation,amine_product[1], dH, rea_id))
-        # c.execute("SELECT * FROM products WHERE smiles=? AND method=? AND solvation=?", (amine_product[0], method, solvation))
-        # prod_am = c.fetchone()
-        # prod_ids.append(prod_am[0])
-        # prods.append(prod_am)
-        # query = f'UPDATE reactants SET {prod_id_col_name}=? WHERE id=?'
-        # print("Check query: ", query)
-        # c.execute(query, ([prod_am[0], rea_id]))
-
-
-        # prod_ids =[ (pid,) for pid in prod_ids ]
-        # print("pord_ids, ", len(prod_ids))
-
-        # c.execute("""
-        #     SELECT smiles,dH FROM products
-        #     WHERE id IN ({0})""".format(', '.join(str(i[0]) for i in prod_ids)))
-        # out = c.fetchall()
-        # print("possible dHabs: ", out)
-
-        # print("Reactant energy fo water: ", reactant_energy)
-
-        # self.dHabs = max([dH[1] for dH in out])
-
-        # print("Product smiles: ",  [val[0] for val in amine_products_all])
 
         ####Later a reordering code will be added here.
 
@@ -617,18 +573,6 @@ class GraphGA(GA):
         
         self.population = self.make_initial_population()
 
-
-        #### Check for miscs & eventually compute them here.
-
-        ### 3 functions here.
-
-        ####:CHECKER FUNCTION
-        #if self.check_for_misc_mols():
-        #    pass#Compute miscs -> Computes them on frontend... -> How to send them to Steno for this step?
-
-
-        ### IF TRUE -> compute miscs -> output a dict
-
         ### save to db.
         ####
         print("Population in run: ", self.population)
@@ -661,35 +605,7 @@ class GraphGA(GA):
         # self.append_results(results, gennum=n + 1, detailed=True)
         
         return results
-    
-    # def check_for_misc_mols(self):
-    #     """
-    #     Use this checker after self.population has been initialized.
-    #     """
 
-    #     conn = sqlite3.connect('molecules_data.db')
-    #     c = conn.cursor()
-    #     method, solvation = self.population[0].options["method"], self.population[0].options["solvation"]
-
-    #     check = False
-    #     c.execute("SELECT smiles, energy FROM miscs WHERE method=? AND solvation=?", (method, solvation))
-    #     result = c.fetchone()
-
-    #     if result is None:
-    #         check = True
-
-    #     conn.commit()
-    #     conn.close()
-
-    #     return check
-        
-    # def compute_misc_mols(self,):
-    #     pass
-    
-    # def insert_misc_mols(self,):
-    #     pass
-
-    
     def add_computed_pops_to_db(self,):
 
         conn = sqlite3.connect(database_path)
