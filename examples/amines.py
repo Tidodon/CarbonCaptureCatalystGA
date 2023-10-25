@@ -10,7 +10,7 @@ import copy
 import sys
 import os
 current_path = os.getcwd()
-print(current_path=="/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA")
+
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
     sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
     sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/catalystGA")
@@ -397,8 +397,11 @@ class AmineCatalyst:
             compute_products = True
         else:
             for prod_id in [product_1_id, product_2_id, product_3_id]:
+                print("PROD ID: " , prod_id)
                 if prod_id is not None:
-                    c.execute("SELECT * FROM products WHERE id=?", str(prod_id))
+                    query = "SELECT * FROM products WHERE id=?"
+                    params = [str(prod_id)]
+                    c.execute(query, params)
                     pro = c.fetchone()
                     prods.append(tuple([pro[1], pro[4], pro[5], pro[6], pro[7]])) ## [1] : smiles, [4] : computed_energy, [5:7] dG's
         print("prods after retrieve loop: ", prods)
@@ -690,7 +693,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt 
 
     ##Get paths to amines and database.
-    current_path = str(Path.cwd())
+    current_path = os.getcwd()
     if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
         amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
         database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
@@ -713,12 +716,12 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+    comp_options = {"method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"}
 
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=1,
+        population_size=35,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",

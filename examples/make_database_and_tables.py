@@ -54,7 +54,6 @@ def empty_dbs(cursor, *args, **kwargs):
          params = []
          if len(kwargs) >0:
             query += " WHERE "
-            params = []
             for item in kwargs.items():
                query += f" {item[0]}=? AND"
                params.append(f"{item[1]}")
@@ -67,9 +66,9 @@ def print_table_contents(cursor, *args, **kwargs):
    for arg in args:
       try: 
          query= f"SELECT * FROM {arg}"
+         params = []
          if len(kwargs) >0:
             query += " WHERE "
-            params = []
             for item in kwargs.items():
                query += f" {item[0]}=? AND" #{item[1]} AND" 
                params.append(f"{item[1]}")
