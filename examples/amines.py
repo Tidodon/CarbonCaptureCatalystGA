@@ -8,8 +8,8 @@ from rdkit.Chem.Draw import IPythonConsole
 from rdkit.ML.Cluster import Butina
 import copy
 import sys
-from pathlib import Path
-current_path = str(Path.cwd())
+import os
+current_path = os.getcwd()
 print(current_path=="/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA")
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
     sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")

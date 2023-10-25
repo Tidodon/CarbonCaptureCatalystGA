@@ -1,6 +1,7 @@
 import sqlite3
-from pathlib import Path
-current_path = str(Path.cwd())
+import os 
+current_path = os.getcwd()
+
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
    database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
 
@@ -86,7 +87,7 @@ def print_table_contents(cursor, *args, **kwargs):
 ###Code to get column names:
 #build_database(c, name1,name2)
 # empty_dbs(c)
-print_table_contents(c, "miscs", "reactants", "products", solvation="alpb")#, method="gfn_2", solvation="gbsa")
+#print_table_contents(c, "miscs", "reactants", "products", solvation="alpb")#, method="gfn_2", solvation="gbsa")
 
 
 
