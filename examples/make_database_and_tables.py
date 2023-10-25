@@ -38,12 +38,20 @@ def build_database(c):
    c.execute("ALTER TABLE products ADD comments text")
    
 
-def empty_dbs(cursor, *args):
+def empty_dbs(cursor, *args, **kwargs):
    ##Possible args in molecules_data.db: reactants, miscs, products.
    for arg in args:
       try: 
          query = f"DELETE FROM {arg}"
-         cursor.execute(query)
+         params = []
+         if len(kwargs) >0:
+            query += " WHERE "
+            params = []
+            for item in kwargs.items():
+               query += f" {item[0]}=? AND"
+               params.append(f"{item[1]}")
+            query = query[:-4]
+         cursor.execute(query, params)
       except:
          print(f"Table with name {arg} does not exist.")
          
@@ -53,11 +61,13 @@ def print_table_contents(cursor, *args, **kwargs):
          query= f"SELECT * FROM {arg}"
          if len(kwargs) >0:
             query += " WHERE "
+            params = []
             for item in kwargs.items():
-               query += f"{item[0]}={item[1]} AND" 
+               query += f" {item[0]}=? AND" #{item[1]} AND" 
+               params.append(f"{item[1]}")
             query = query[:-4]
 
-         cursor.execute(query)
+         cursor.execute(query, params)
          print(f"{arg} column names: ", [desc[0] for desc in cursor.description])
          v = cursor.fetchall()
          for val in v:

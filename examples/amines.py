@@ -8,10 +8,25 @@ from rdkit.Chem.Draw import IPythonConsole
 from rdkit.ML.Cluster import Butina
 import copy
 import sys
-sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
-sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/catalystGA")
-#sys.path.append("/CarbonCapture/CarbonCaptureCatalystGA/catalystGA")
-#sys.path.append("/CarbonCapture/CarbonCaptureCatalystGA/")
+from pathlib import Path
+current_path = str(Path.cwd())
+print(current_path)
+print(current_path=="/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA")
+if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
+    sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
+    sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/catalystGA")
+    amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
+    database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
+
+elif current_path == "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
+    sys.path.append("/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/catalystGA")
+    sys.path.append("/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/")
+    amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
+    database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
+else:
+    print("Path is different than testing or running environemnt")
+    print("The path is: ", current_path)
+
 from catalystGA import GA
 from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
@@ -338,7 +353,7 @@ class AmineCatalyst:
         OCOO_energy = 0
 
         method, solvation = self.options['method'], self.options['solvation']
-        CO2_smiles, H2O_smiles, OCOO_smiles = "O=C=O", "O", "[O-]C(=O)O"
+        CO2_smiles, H2O_smiles, OCOO_smiles = "O=C=O", "[H]O[H]", "[H]OC(=O)[O-]" # "O", "O=C([O-])O"
         
 
 
@@ -350,8 +365,7 @@ class AmineCatalyst:
         prods = []#None for _ in range(3)]## Hardcoded number of possible products.
         prod_ids = [None for _ in range(3)]
 
-        #conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
-        conn = sqlite3.connect('/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db')
+        conn = sqlite3.connect(database_path)
         print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
@@ -363,8 +377,9 @@ class AmineCatalyst:
 
 
 
-        try: 
-            c.execute("SELECT smiles, energy FROM miscs WHERE method=? AND solvation=?", (method, solvation))
+        try:
+            query = "SELECT smiles, energy FROM miscs WHERE method=? AND solvation=?"
+            c.execute(query, (method, solvation))
             miscs_data  = c.fetchall()
             names, es   = [ v[0] for v in miscs_data], [ v[1] for v in miscs_data]
             CO2_energy  = float(es[names.index(CO2_smiles)])
@@ -561,8 +576,7 @@ class GraphGA(GA):
         self.comp_options = comp_options
 
     def make_initial_population(self):
-        #amine_pops_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
-        amine_pops_path = "examples/data/amines.csv"
+        amine_pops_path = amines_csv_path
         with open(amine_pops_path, "r") as f: #data -> csv
             lines = f.readlines()[1:]
         mols = [Chem.MolFromSmiles(line.split(",")[0]) for line in lines]
@@ -618,7 +632,9 @@ class GraphGA(GA):
         ### save to db.
         ####
         print("Population in run: ", self.population)
-        self.population = self.calculate_scores(self.population, gen_id=0)
+        for pop in self.population:
+            pop.calculate_score()
+        #self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
@@ -676,9 +692,7 @@ class GraphGA(GA):
     
     def add_computed_pops_to_db(self,):
 
-        conn = sqlite3.connect('/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db')
-
-        #conn = sqlite3.connect('molecules_data.db')
+        conn = sqlite3.connect(database_path)
         c = conn.cursor()
         
         print("Did connection to database in ga.add_individuals succeed? :", AmineCatalyst.chk_conn(conn))
@@ -762,7 +776,10 @@ if __name__ == "__main__":
     #import time
     import pandas as pd 
     import matplotlib.pyplot as plt
-    amines = pd.read_csv("examples/data/amines.csv")
+
+
+    
+    amines = pd.read_csv(amines_csv_path)
     #exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
 
     calc_dH, exp_dH = [], []
@@ -785,15 +802,15 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("[K+].[O-]C(=O)[C@@H]1CCCN1"))#112.34863236070932
-    m.options = comp_options
-    m.program = comp_program
-    m.calculate_score()
+    # m = AmineCatalyst(Chem.MolFromSmiles("[K+].[O-]C(=O)[C@@H]1CCCN1"))#112.34863236070932
+    # m.options = comp_options
+    # m.program = comp_program
+    # m.calculate_score()
     
-    print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
+    # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
     results= []
-    #results = ga.run()
+    results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
