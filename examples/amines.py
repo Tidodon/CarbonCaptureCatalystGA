@@ -144,6 +144,7 @@ class AmineCatalyst:
 
         if self.options["opt"]:
             options_string += ' OPT'
+            orca_options["opt"] = ""
         else:
             print("Unspecified optimization")
         orca_options = {options_string:""}
@@ -155,13 +156,18 @@ class AmineCatalyst:
 
         self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
         print("Name of mol:", Chem.MolToSmiles(self.mol))
+
+        ### Ad.hoc solution for upgraded conformer treatment.
+        a,b = np.log(10)/10, 0.1
+        threshhold = b* math.exp(a * int(Chem.RemoveHs(self.mol).GetNumAtoms()))
+
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
                         self.mol,
                         clearConfs=True,
                         # maxAttempts = 10,
                         numConfs=500,
                         useRandomCoords=True,
-                        pruneRmsThresh=1.0,
+                        pruneRmsThresh=threshhold,
                         #randomSeed=5
                     )
         
@@ -170,13 +176,14 @@ class AmineCatalyst:
 
         ##### Conformer pruning based on whether optimization converged and energy magnitude.
         num_confs = self.mol.GetNumConformers()
+
         min_e_conf = min([optimized_confs[i][1] for i in range(num_confs)])
         for i in range(num_confs-1, -1, -1):
-            print(optimized_confs[i])
+            #print(optimized_confs[i])
             if  bool(optimized_confs[i][0]):
                 self.mol.RemoveConformer(i)
             elif (optimized_confs[i][1] - min_e_conf) > 10:
-                print((optimized_confs[i][1] - min_e_conf))
+                #print((optimized_confs[i][1] - min_e_conf))
                 self.mol.RemoveConformer(i)
 
         num_confs = self.mol.GetNumConformers()
@@ -221,9 +228,9 @@ class AmineCatalyst:
             print("orca options: ", orca_options)
             #### Prepare orca output to same format as xtb output:
             try:
+                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
                 return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
             except:
-                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
                 print("Incorrect termination of Orca. -> atoms/opt_coords/electronic_energy dict keys don't respond")
                 print(self.smiles, self.options, orca_options)
                 return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
@@ -496,11 +503,11 @@ class AmineCatalyst:
         #dH scorings alone.
         self.score = self.dHabs[1]
 
-        ####Later a reordering code will be added here.
+        #### Later a reordering code will be added here.
 
         #order_amine_products(dH, dG) -> top three most reactive. 
 
-        #####
+        ####
 
         conn.commit()
         conn.close()
@@ -716,7 +723,7 @@ if __name__ == "__main__":
     names, dHs = [],[]
 
     comp_program = "xtb"
-    comp_options = {"method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"}
+    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
 
 
     ga = GraphGA(
