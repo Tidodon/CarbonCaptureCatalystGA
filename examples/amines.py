@@ -130,19 +130,17 @@ class AmineCatalyst:
     
     def prepare_orca_options(self) -> dict:
         orca_options = {}
-        options_string = ""
         try:
             #mtd, tp = self.options["method"].split("_") ## Probably unnecessary for orca calculations.
-            options_string += (f'{self.options["method"]}').upper()
+            orca_options[(f'{self.options["method"]}').upper()] = ""
         except:
             print("Unspecified QM method")
 
         try:
-            options_string += f' {self.options["solvation"]}({self.options["solvent"]})'.upper()
+            orca_options[self.options["solvation"].upper()]=self.options["solvent"].lower().capitalize()
+            #options_string += f' {self.options["solvation"]}({self.options["solvent"]})'.lower()
         except:
             print("Unspecified solvation")
-
-        orca_options[options_string] = ""
 
         if self.options["opt"]:
             #options_string += ' OPT'
@@ -158,9 +156,10 @@ class AmineCatalyst:
         self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
         print("Name of mol:", Chem.MolToSmiles(self.mol))
 
-        threshold = 0.4
-        if  Chem.RemoveHs(self.mol).GetNumAtoms() > 10:
+        threshold = 0.3
+        if  Chem.RemoveHs(self.mol).GetNumAtoms() > 9:
             threshold = 1.0
+
 
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
                         self.mol,
@@ -220,11 +219,12 @@ class AmineCatalyst:
                 return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
 
         elif self.program == "orca":
-            charge=0
-            try: 
-                charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
-            except:
-                charge = Chem.rdmolops.GetFormalCharge(self.mol)#0
+            # charge=0
+            # try: 
+            #     charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
+            # except:
+            #     charge = Chem.rdmolops.GetFormalCharge(self.mol)#0
+            charge = Chem.rdmolops.GetFormalCharge(self.mol)
             orca_options = self.prepare_orca_options()
             print("orca options: ", orca_options)
             #### Prepare orca output to same format as xtb output:
@@ -344,6 +344,11 @@ class AmineCatalyst:
         compute_reactant = False
         compute_products = False
 
+        compute_dG1 = False
+        compute_dG2 = False
+        compute_dG3 = False
+
+
         results_dict = {}
 
         CO2_energy  = 0
@@ -460,13 +465,6 @@ class AmineCatalyst:
                 prods.append(prod)
             results_dict["products"] = prods
             
-        def get_dH (e_prod):
-
-            products = e_prod + OCOO_energy
-            reactants = reactant_energy + CO2_energy + H2O_energy
-            return abs(products - reactants)
-        
-
         #### Check that all energies are not None
         ##### Compute dH value for each of the products.
 
@@ -483,7 +481,10 @@ class AmineCatalyst:
                     print("This is NaN: ", ele_name, ele)
 
             amine_product_name = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
-            dHs.append([amine_product_name, AmineCatalyst.hartree_to_kjmol(get_dH(amine_product[1]))])
+            products = amine_product[1] + OCOO_energy
+            reactants = reactant_energy + CO2_energy + H2O_energy
+            
+            dHs.append([amine_product_name, AmineCatalyst.hartree_to_kjmol(abs(products - reactants))])
 
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
@@ -724,13 +725,16 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    comp_program = "orca"#"xtb"
+    comp_program = "xtb"
+    comp_options = {"method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"}
+
+    comp_program = "orca"
     comp_options = {"method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"}
 
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=5,
+        population_size=1,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -739,15 +743,15 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    m = AmineCatalyst(Chem.MolFromSmiles("NCCO"))#112.34863236070932
-    m.options = comp_options
-    m.program = comp_program
-    m.calculate_score()
+    # m = AmineCatalyst(Chem.MolFromSmiles("[NH3+]CCO"))#112.34863236070932
+    # m.options = comp_options
+    # m.program = comp_program
+    # m.calculate_energy(n_cores=1)
     
-    print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
+    # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
     results= []
-    #results = ga.run()
+    results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
