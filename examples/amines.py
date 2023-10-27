@@ -142,12 +142,13 @@ class AmineCatalyst:
         except:
             print("Unspecified solvation")
 
+        orca_options[options_string] = ""
+
         if self.options["opt"]:
-            options_string += ' OPT'
-            orca_options["opt"] = ""
+            #options_string += ' OPT'
+            orca_options["OPT"] = ""
         else:
             print("Unspecified optimization")
-        orca_options[options_string] = ""
         return orca_options
     
     def calculate_energy(self, n_cores):
@@ -723,8 +724,8 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    comp_program = "xtb"
-    comp_options = {"method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+    comp_program = "orca"#"xtb"
+    comp_options = {"method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"}
 
 
     ga = GraphGA(
@@ -738,15 +739,15 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    # m = AmineCatalyst(Chem.MolFromSmiles("CCCCCCCCCCCCNCCO"))#112.34863236070932
-    # m.options = comp_options
-    # m.program = comp_program
-    # m.calculate_score()
+    m = AmineCatalyst(Chem.MolFromSmiles("NCCO"))#112.34863236070932
+    m.options = comp_options
+    m.program = comp_program
+    m.calculate_score()
     
-    # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
+    print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
     results= []
-    results = ga.run()
+    #results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
