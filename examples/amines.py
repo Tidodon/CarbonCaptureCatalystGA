@@ -147,7 +147,7 @@ class AmineCatalyst:
             orca_options["opt"] = ""
         else:
             print("Unspecified optimization")
-        orca_options = {options_string:""}
+        orca_options[options_string] = ""
         return orca_options
     
     def calculate_energy(self, n_cores):
@@ -157,9 +157,9 @@ class AmineCatalyst:
         self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
         print("Name of mol:", Chem.MolToSmiles(self.mol))
 
-        ### Ad.hoc solution for upgraded conformer treatment.
-        a,b = np.log(10)/10, 0.1
-        threshhold = b* math.exp(a * int(Chem.RemoveHs(self.mol).GetNumAtoms()))
+        threshold = 0.4
+        if  Chem.RemoveHs(self.mol).GetNumAtoms() > 10:
+            threshold = 1.0
 
         _ = Chem.rdDistGeom.EmbedMultipleConfs(
                         self.mol,
@@ -167,7 +167,7 @@ class AmineCatalyst:
                         # maxAttempts = 10,
                         numConfs=500,
                         useRandomCoords=True,
-                        pruneRmsThresh=threshhold,
+                        pruneRmsThresh=threshold,
                         #randomSeed=5
                     )
         
@@ -243,7 +243,7 @@ class AmineCatalyst:
         boltz_exponents = [((val[2]-confs[0][2]))/(self.K_B * self.T_K) for val in confs ]
         print("BOLTZ exponents", boltz_exponents)
         boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
-        print("Check normalization: ")
+        print("Check normalization: ", boltzmann_pop_reactants, sum(boltzmann_pop_reactants))
         return sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
         
     def compute_and_weight_energy(self, n_cores):
@@ -683,6 +683,7 @@ class GraphGA(GA):
         plt.plot([], [], label=f'stderr: {se:.2f}')
         plt.xlim(0,max(exp_dH+calc_dH) )
         plt.ylim(0,max(exp_dH+calc_dH) )
+        plt.title(f"{options['method']} {options['solvation']}")
         plt.legend()
         try:
             figname = "_".join([str(val) for val in options.values()])+".eps"
@@ -728,7 +729,7 @@ if __name__ == "__main__":
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=35,
+        population_size=5,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -737,7 +738,7 @@ if __name__ == "__main__":
         comp_program=comp_program
     )
 
-    # m = AmineCatalyst(Chem.MolFromSmiles("[K+].[O-]C(=O)[C@@H]1CCCN1"))#112.34863236070932
+    # m = AmineCatalyst(Chem.MolFromSmiles("CCCCCCCCCCCCNCCO"))#112.34863236070932
     # m.options = comp_options
     # m.program = comp_program
     # m.calculate_score()
