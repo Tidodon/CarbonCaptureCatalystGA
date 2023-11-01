@@ -252,20 +252,28 @@ class AmineCatalyst:
         if "." in mol_name:
             submols = mol_name.split(".")
             tot_e = 0
+
+            maxsub = max(submols, key=len) #Picks the largest ionic part of the molecule.
+            conf_coords = []
+
             for submol in submols:
                 print("SUBMOL: " , submol)
                 sub = AmineCatalyst(Chem.MolFromSmiles(submol))
                 sub.program, sub.options = self.program, copy.copy(self.options)
-                if Chem.MolFromSmiles(submol).GetNumAtoms() ==1 :
+                if Chem.MolFromSmiles(submol).GetNumAtoms() == 1 :
                     print("SUBOPTIONS: ", submol, sub.options)
                     _ = sub.options.pop("opt")
                 confs = sub.calculate_energy(n_cores=n_cores)
+                if submol == maxsub:
+                    conf_coords = confs
                 tot_e += sub.weight_energy(confs)
-            return tot_e
+            
+            #Pick largest submol -> under assumption the smaller parts are simple ions.
+            return tot_e, confs[np.argmin([conf[2] for conf in conf_coords])][1]
         else:
             confs = self.calculate_energy(n_cores=n_cores)
-            return self.weight_energy(confs)
 
+            return self.weight_energy(confs), [conf[2] for conf in confs]
     def cat_products(self, patt, repl, n_cores):
         """
         A generator method that gives smiles representation 
@@ -369,7 +377,7 @@ class AmineCatalyst:
         prod_ids = [None for _ in range(3)]
 
         conn = sqlite3.connect(database_path)
-        print("Is calculate_score connecte to database?", AmineCatalyst.chk_conn(conn))
+        print("Is calculate_score connected to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
         
@@ -429,9 +437,10 @@ class AmineCatalyst:
                 # if name == OCOO_smiles:
                 #     charge = -1
                 name_mol         = AmineCatalyst(Chem.MolFromSmiles(name))
+                name_mol.program = self.program
                 name_mol.options = self.options
                 print("name_mol options: ", name_mol.options)
-                name_energy      = name_mol.compute_and_weight_energy(n_cores=n_cores)#name_mol.weight_energy(confs_e)
+                name_energy, name_coords = name_mol.compute_and_weight_energy(n_cores=n_cores)#name_mol.weight_energy(confs_e)
 
                 #### Temporary ugly block for misc energy values.
                 if name == CO2_smiles:
@@ -440,17 +449,17 @@ class AmineCatalyst:
                     H2O_energy = name_energy
                 if name == OCOO_smiles:
                     OCOO_energy = name_energy
-                miscs_lst.append([name_mol, name_energy])
+                miscs_lst.append([name_mol, name_energy, name_coords])
             results_dict["miscs"] = miscs_lst
                 
-
         if compute_reactant:
             
-            reactant_energy = self.compute_and_weight_energy(n_cores=n_cores)
+            reactant_energy, reactant_coords = self.compute_and_weight_energy(n_cores=n_cores)
             print("inside except reactant energy: ", reactant_energy)
-            results_dict["reactant"] = reactant_energy
+            results_dict["reactant"] = [reactant_energy, reactant_coords]
 
         if compute_products:
+
             ### Compute primary/secondary/tertiary amine protonation product.
             ################################################
             amine_products_all = self.compute_amine_products(n_cores=n_cores)
@@ -485,6 +494,20 @@ class AmineCatalyst:
             reactants = reactant_energy + CO2_energy + H2O_energy
             
             dHs.append([amine_product_name, AmineCatalyst.hartree_to_kjmol(abs(products - reactants))])
+
+        ###### Compute k  #######
+
+        #dG = compute_dG(mol, dG)
+        
+
+
+
+
+
+
+
+
+
 
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
@@ -750,8 +773,8 @@ if __name__ == "__main__":
     
     # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
-    results= []
-    results = ga.run()
+    results = []
+    #results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
