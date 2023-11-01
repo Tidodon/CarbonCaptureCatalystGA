@@ -480,6 +480,7 @@ class AmineCatalyst:
 
         dHs = []
         for amine_product in prods:
+            print("AMINE  PRODUCXT", amine_product)
             amine_product_energy = amine_product[1][0] # 1 element on second index is the list of conformer coordinates.
             if amine_product is None:
                 continue
@@ -656,12 +657,13 @@ class GraphGA(GA):
                 for misc in individual.results["miscs"]:
                     misc_name, misc_energy= Chem.MolToSmiles(misc[0].mol), misc[1]
                     params = (misc_name, method, solvation, misc_energy)
-                    c.execute("INSERT INTO miscs VALUES(?,?,?,?)", params)
-
+                    print("PARAMS", params)
+                    c.execute("INSERT INTO miscs(smiles, method, solvation, energy) VALUES(?,?,?,?)", params)
+ 
             if "reactant" in individual.results.keys():
 
                 reactant_smiles, reactant_energy = Chem.MolToSmiles(individual.mol) ,individual.results["reactant"]
-                c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy))
+                c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy[0]))
                 c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
                 rea_id = int(c.fetchone()[0])
                 # rea_id, reactant_energy, product_1_id, product_2_id, product_3_id
@@ -753,8 +755,8 @@ if __name__ == "__main__":
     comp_program = "xtb"
     comp_options = {"method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"}
 
-    comp_program = "orca"
-    comp_options = {"method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"}
+    #comp_program = "orca"
+    #comp_options = {"method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"}
 
 
     ga = GraphGA(
@@ -776,7 +778,7 @@ if __name__ == "__main__":
     # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
     results = []
-    #results = ga.run()
+    results = ga.run()
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######

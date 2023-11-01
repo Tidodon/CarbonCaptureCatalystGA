@@ -84,10 +84,10 @@ def print_table_contents(cursor, *args, **kwargs):
 
 ###Code to get column names:
 #build_database(c, name1,name2)
-#empty_dbs(c, "reactants", "products", "miscs", method="gfn_1", solvation="gbsa")
+#empty_dbs(c, "reactants", "products", "miscs")#, method="gfn_1", solvation="gbsa")
 
 
-#print_table_contents(c,"products", solvation="alpb")#, method="gfn_2", solvation="gbsa")
+print_table_contents(c, "miscs", )#"products", solvation="alpb")#, method="gfn_2", solvation="gbsa")
 #
 # "miscs", "reactants", #
 
