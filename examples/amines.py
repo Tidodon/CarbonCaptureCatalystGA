@@ -9,7 +9,7 @@ from rdkit.ML.Cluster import Butina
 import copy
 import sys
 import os
-current_path = os.getcwd()
+current_path = os.getcwd() # outputs a string
 
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
     sys.path.append("/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/")
@@ -156,7 +156,7 @@ class AmineCatalyst:
         self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
         print("Name of mol:", Chem.MolToSmiles(self.mol))
 
-        threshold = 0.3
+        threshold = 0.5
         if  Chem.RemoveHs(self.mol).GetNumAtoms() > 9:
             threshold = 1.0
 
@@ -269,11 +269,12 @@ class AmineCatalyst:
                 tot_e += sub.weight_energy(confs)
             
             #Pick largest submol -> under assumption the smaller parts are simple ions.
-            return tot_e, confs[np.argmin([conf[2] for conf in conf_coords])][1]
+            return tot_e, [conf[1] for conf in conf_coords]
         else:
             confs = self.calculate_energy(n_cores=n_cores)
 
-            return self.weight_energy(confs), [conf[2] for conf in confs]
+            return self.weight_energy(confs), [conf[1] for conf in confs]
+        
     def cat_products(self, patt, repl, n_cores):
         """
         A generator method that gives smiles representation 
@@ -301,8 +302,8 @@ class AmineCatalyst:
             cat = AmineCatalyst(prod)
             cat.options = self.options
             cat.program = self.program
-                    
-            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy(n_cores=n_cores)]
+            #Yields String, tuple of energy and coords:
+            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy(n_cores=n_cores)] 
 
     def compute_amine_products(self, n_cores):
         if self.amine_type[0]: # If mol has primary amine
@@ -479,9 +480,10 @@ class AmineCatalyst:
 
         dHs = []
         for amine_product in prods:
+            amine_product_energy = amine_product[1][0] # 1 element on second index is the list of conformer coordinates.
             if amine_product is None:
                 continue
-            eles = [ amine_product[1], OCOO_energy, reactant_energy, CO2_energy, H2O_energy]
+            eles = [ amine_product_energy, OCOO_energy, reactant_energy, CO2_energy, H2O_energy]
             ele_names = [ amine_product[0], OCOO_smiles, Chem.MolToSmiles(self.mol), CO2_smiles, H2O_smiles]
 
             #####CHECK for correct computation and assigning of values.
@@ -490,7 +492,7 @@ class AmineCatalyst:
                     print("This is NaN: ", ele_name, ele)
 
             amine_product_name = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
-            products = amine_product[1] + OCOO_energy
+            products = amine_product_energy + OCOO_energy
             reactants = reactant_energy + CO2_energy + H2O_energy
             
             dHs.append([amine_product_name, AmineCatalyst.hartree_to_kjmol(abs(products - reactants))])
@@ -513,7 +515,7 @@ class AmineCatalyst:
         self.dHabs = max(dHs, key=lambda x :x[1])
         
         print( reactant_smiles, " -> ", amine_product[0] )
-        print( reactant_energy, " -> ", amine_product[1] )
+        print( reactant_energy, " -> ", amine_product_energy )
 
         self.results = results_dict
         print("Results dict: ", self.results)
