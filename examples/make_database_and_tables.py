@@ -10,11 +10,6 @@ elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatal
 else:
    print("Outside predefined working directories.")
 
-conn = sqlite3.connect(database_path)
-c = conn.cursor()
-
-c.execute("SELECT name FROM sqlite_master WHERE type='table';")
-table_names = [v[0] for v in c.fetchall()]
 
 def build_database(c):
    c.execute("""CREATE TABLE reactants(
@@ -91,10 +86,17 @@ def print_table_contents(cursor, *args, **kwargs):
 # "miscs", "reactants", #
 
 if __name__ == "__main__":
+   conn = sqlite3.connect(database_path)
+   c = conn.cursor()
+
+   c.execute("SELECT name FROM sqlite_master WHERE type='table';")
+   table_names = [v[0] for v in c.fetchall()]
+
    print_table_contents(c, "miscs","products", "reactants" )#"products", solvation="alpb")#, method="gfn_2", solvation="gbsa")
+   #empty_dbs(c, "miscs", "products", "reactants")
+
+   conn.commit()
+   conn.close()
 
 
 
-
-conn.commit()
-conn.close()

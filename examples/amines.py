@@ -11,7 +11,6 @@ import sys
 import os
 
 ### Modules
-import energy_utils
 import dH_utils
 import sql_utils
 #import ts_utils
