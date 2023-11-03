@@ -24,15 +24,18 @@ from xtb import xtb_calculate
 from orca import orca_calculate
 import math
 import sqlite3
+import copy
 
 class energy_utils:
+
+    misc_smiles          = ["O=C=O", "[H]O[H]", "[H]OC(=O)[O-]"]
+    K_B                  = 3.166811563 * math.pow(10,-6)         # E_h/K
     
     def __init__(self, smile: str, options: dict, cursor: sqlite3.Connection) -> None:
         self.smile       = smile
-        self.options     = options
+        self.options     = options 
         self.cursor      = cursor
-        self.misc_smiles = ["O=C=O", "[H]O[H]", "[H]OC(=O)[O-]"]
-        self.K_B         = 3.166811563 * math.pow(10,-6)         # E_h/K
+
         self.T_K         = 313                                   # Kelvin
         self.n_cores     = 1                                     # Cores to be used in the computation.
 
@@ -43,12 +46,12 @@ class energy_utils:
         """
 
         method, solvation = self.options['method'], self.options['solvation']
-        miscs_data = []
-        misc_check = sql_utils.check_if_miscs_in_db(self.cursor, method=method, solvation=solvation)
+        miscs_data        = []
+        misc_check        = sql_utils.check_if_miscs_in_db(self.cursor, method=method, solvation=solvation)
         if misc_check:
-            miscs_data = sql_utils.recover_miscs(misc_check)
+            miscs_data    = sql_utils.recover_miscs(misc_check)
         else:
-            miscs_data = self.compute_miscs()
+            miscs_data    = self.compute_miscs()
 
         return miscs_data
 
@@ -57,8 +60,8 @@ class energy_utils:
         miscs_dict = {}
         
         for misc_smile in self.misc_smiles:
-            name_energy, name_coords = self.compute_and_weight_energy()
-            miscs_dict[misc_smile] = name_energy
+            name_energy, name_coords                          = self.compute_and_weight_energy()
+            miscs_dict[misc_smile]                            = name_energy
             miscs_dict["opt_conformer_coords_of_"+misc_smile] = name_coords
         return miscs_dict
 
@@ -106,14 +109,14 @@ class energy_utils:
 
         return E/Z
         
-    def calculate_energy(self, mol_smile):
+    def calculate_energy(self, submol_smile):
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
 
-        mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(mol_smile)))
+        mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(submol_smile)))
 
         threshold = 0.5
-        if  Chem.RemoveHs(self.mol).GetNumAtoms() > 9:
+        if  Chem.RemoveHs(mol).GetNumAtoms() > 9:
             threshold = 1.0
 
         # if Chem.MolFromSmiles(mol).GetNumAtoms() == 1 :
@@ -142,7 +145,7 @@ class energy_utils:
                 self.mol.RemoveConformer(i)
             elif (optimized_confs[i][1] - min_e_conf) > 10:
                 #print((optimized_confs[i][1] - min_e_conf))
-            self.mol.RemoveConformer(i)
+                mol.RemoveConformer(i)
 
         num_confs = self.mol.GetNumConformers()
 
@@ -169,7 +172,7 @@ class energy_utils:
                 xtb_options["charge"] = Chem.rdmolops.GetFormalCharge(self.mol)
             print("XTB options: ", xtb_options)
             try:
-                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
+                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=self.n_cores) for conformer in (self.mol).GetConformers()]
                 return res
             except:
                 print("Incorrect termination of XTB.")
@@ -195,6 +198,58 @@ class energy_utils:
                 return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
         else:
             raise "Incorrect specification of the QM program."
+        
+    def prepare_xtb_options(self) -> dict:
+        """
+        Build an input dicionary for the xtb_calculate function to perfrom xtb calculations.
+        """
+        xtb_options = {}
+        print("optioNS in prepration method:", self.options)
+        
+        try:
+            mtd, tp = self.options["method"].split("_")
+            xtb_options[mtd]=int(tp)
+        except:
+            print("Unspecified QM method")
+
+        try:
+            xtb_options[self.options["solvation"]] = self.options["solvent"]
+        except:
+            print("Unspecified solvation")
+
+        try:
+            xtb_options["opt"] = self.options["opt"]
+        except:
+            print("Unspecified optimization")
+
+        try:
+            xtb_options["charge"] = self.options["charge"]
+        except:
+            print("Unspecified charge")
+
+        return xtb_options
+    
+
+    def prepare_orca_options(self) -> dict:
+        orca_options = {}
+        try:
+            #mtd, tp = self.options["method"].split("_") ## Probably unnecessary for orca calculations.
+            orca_options[(f'{self.options["method"]}').upper()] = ""
+        except:
+            print("Unspecified QM method")
+
+        try:
+            orca_options[self.options["solvation"].upper()]=self.options["solvent"].lower().capitalize()
+            #options_string += f' {self.options["solvation"]}({self.options["solvent"]})'.lower()
+        except:
+            print("Unspecified solvation")
+
+        if self.options["opt"]:
+            #options_string += ' OPT'
+            orca_options["OPT"] = ""
+        else:
+            print("Unspecified optimization")
+        return orca_options
     
 if __name__ == "__main__":
     pass
