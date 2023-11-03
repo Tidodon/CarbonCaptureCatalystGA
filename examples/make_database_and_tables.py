@@ -87,10 +87,11 @@ def print_table_contents(cursor, *args, **kwargs):
 #empty_dbs(c, "reactants", "products", "miscs")#, method="gfn_1", solvation="gbsa")
 
 
-print_table_contents(c, "miscs", )#"products", solvation="alpb")#, method="gfn_2", solvation="gbsa")
 #
 # "miscs", "reactants", #
 
+if __name__ == "__main__":
+   print_table_contents(c, "miscs","products", "reactants" )#"products", solvation="alpb")#, method="gfn_2", solvation="gbsa")
 
 
 

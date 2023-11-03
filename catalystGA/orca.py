@@ -136,7 +136,7 @@ def write_orca_input(
         )
     inputstr += "*\n"
     inputstr += "\n"  # magic line
-
+    print("ORCA INPUT STR: ", inputstr)
     return inputstr
 
 
@@ -254,7 +254,6 @@ def read_hirshfeld_charges(lines: List[str]) -> list:
         charge = float(line.split()[-2])
         hirshfeld_charges.append(charge)
     return hirshfeld_charges
-
 
 def get_orca_results(
     lines: List[str],

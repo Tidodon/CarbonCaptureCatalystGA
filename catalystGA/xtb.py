@@ -57,7 +57,8 @@ def xtb_calculate(
 
     # Options to xTB command
     cmd = f"{XTB_CMD} --norestart --verbose --parallel {n_cores} "
-    for key, value in options.items():
+
+    for key, value in options.items():#-5.208167929339086
         if value is None or value is True:
             cmd += f"--{key} "
         else:
@@ -65,7 +66,6 @@ def xtb_calculate(
     if detailed_input is not None:
         fpath = write_detailed_input(detailed_input, tmp_scr)
         cmd += f"--input {fpath.name} "
-
     result = run_xtb((cmd, xyz_file))
     if not normal_termination(result):
         _logger.warning("xTB did not terminate normally")
@@ -74,7 +74,7 @@ def xtb_calculate(
     if "opt" in options:
         atoms, coords = read_opt_structure(result)
     energy = read_energy(result)
-
+    
     return atoms, coords, energy
 
 

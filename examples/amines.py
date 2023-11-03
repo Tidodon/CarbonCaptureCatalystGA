@@ -9,6 +9,13 @@ from rdkit.ML.Cluster import Butina
 import copy
 import sys
 import os
+
+### Modules
+import energy_utils
+import dH_utils
+import sql_utils
+#import ts_utils
+
 current_path = os.getcwd() # outputs a string
 
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
@@ -481,7 +488,7 @@ class AmineCatalyst:
         dHs = []
         for amine_product in prods:
             print("AMINE  PRODUCXT", amine_product)
-            amine_product_energy = amine_product[1][0] # 1 element on second index is the list of conformer coordinates.
+            amine_product_energy = amine_product[1] # 1 element on second index is the list of conformer coordinates.
             if amine_product is None:
                 continue
             eles = [ amine_product_energy, OCOO_energy, reactant_energy, CO2_energy, H2O_energy]
@@ -553,6 +560,7 @@ class GraphGA(GA):
         db_location,
         comp_program,
         comp_options,
+        miscs,
     ):
         super().__init__(
             mol_options=mol_options,
@@ -564,6 +572,8 @@ class GraphGA(GA):
         )
         self.comp_program = comp_program
         self.comp_options = comp_options
+        self.miscs =  [] 
+
 
     def make_initial_population(self):
         amine_pops_path = amines_csv_path
@@ -606,10 +616,16 @@ class GraphGA(GA):
         self.print_parameters()
         
         self.population = self.make_initial_population()
+        
+        # self.miscs = [get_miscs(options) for options in list_of_options]
 
         ### save to db.
         ####
         print("Population in run: ", self.population)
+
+
+
+
         for pop in self.population:
             pop.calculate_score()
         #self.population = self.calculate_scores(self.population, gen_id=0)
