@@ -36,7 +36,7 @@ class energy_utils:
 
     patts = [Chem.MolFromSmarts("[ND1]"),Chem.MolFromSmarts("[ND2]"),Chem.MolFromSmarts("[ND3]")]
     repls =  [Chem.MolFromSmarts("[NH3+]"),Chem.MolFromSmarts("[NH2+]"),Chem.MolFromSmarts("[NH+]")]#
-    misc_smiles          = ["O=C=O", "[H]O[H]", "[H]OC(=O)[O-]"]
+    misc_smiles          = ("O=C=O", "[H]O[H]", "[H]OC(=O)[O-]")
     K_B                  = 3.166811563 * math.pow(10,-6)         # E_h/K
     
     def __init__(self, smile: str, options: dict, cursor: sqlite3.Connection) -> None:
@@ -47,8 +47,17 @@ class energy_utils:
         self.T_K         = 313                                   # Kelvin
         self.n_cores     = 1                                     # Cores to be used in the computation.
         self.amine_type = tuple(True if Chem.MolFromSmiles(self.smile).HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
+        self.misc_results = []
+        self.reac_results = []
+        self.prod_results = []
 
-
+    @staticmethod
+    def hartree_to_kjmol(hartree) -> float:
+        ### Hartree to Joule value from NIST, and Avogadro's number taken from wiki
+        joule = 4.3597447222071 * 10**(-18) #Joule/Hartree
+        Na = 6.02214076 * 10**23 # 1/mol
+        return hartree * joule * Na * 0.001  
+    
     def get_miscs(self):
         """
         Overview function to recover miscalleneous molecules data,carbon dioxide water hydrogen-carbonate, from 
@@ -56,10 +65,11 @@ class energy_utils:
         """
 
         method, solvation = self.options['method'], self.options['solvation']
-        miscs_data        = []
+        miscs_data        = {}
         misc_check        = sql_utils.check_if_miscs_in_db(self.cursor, method=method, solvation=solvation)
+
         if misc_check:
-            miscs_data    = sql_utils.recover_miscs(misc_check)
+            miscs_data    = sql_utils.recover_miscs(misc_check) #miscs dict
         else:
             miscs_data    = self.compute_miscs()
 
@@ -68,14 +78,21 @@ class energy_utils:
     def compute_miscs(self):
 
         miscs_dict = {}
+
+        precomputed_misc_confs = []
+        precomputed_misc_atoms = []
+
+        if self.misc_results:
+            #precomputed_misc_confs
+            #precomputed_misc_atoms
+            pass
         
         for misc_smile in self.misc_smiles:
-            name_energy, name_coords                          = self.compute_and_weight_energy()
-            miscs_dict[misc_smile]                            = name_energy
-            miscs_dict["opt_conformer_coords_of_"+misc_smile] = name_coords
+            name_energy, name_coords, name_atoms              = self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=precomputed_misc_confs, precomputed_atoms=precomputed_misc_atoms)
+            miscs_dict[misc_smile]                            = (name_energy, name_coords, name_atoms)
         return miscs_dict
 
-    def compute_and_weight_energy(self, separate=True, precomputed_confs=[], precomputed_atoms=[]):
+    def compute_and_weight_energy(self, mol= "", separate=True, precomputed_confs=[], precomputed_atoms=[]):
         """
         Overhead to deal with potential ionic compounds and compute their energies and coordinates.
         
@@ -86,10 +103,17 @@ class energy_utils:
         - list of conformer coordinates, if the compound was ionic only the largest part is retained here.
         """
 
-        if "." in self.smile:
-            sub_smiles = self.smile.split(".")
+        if not mol:
+            if "." in self.smile:
+                sub_smiles = self.smile.split(".")
+            else:
+                sub_smiles = [self.smile]
         else:
-            sub_smiles = [self.smile]
+            if "." in mol:
+                sub_smiles = mol.split(".")
+            else:
+                sub_smiles = [mol]
+
 
         tot_e = 0
         maxsub = max(sub_smiles, key=len) #Picks the largest ionic part of the molecule or simply the molecule itself if it is not ionic.
@@ -220,7 +244,6 @@ class energy_utils:
         Build an input dicionary for the xtb_calculate function to perfrom xtb calculations.
         """
         xtb_options = {}
-        print("optioNS in prepration method:", self.options)
         
         try:
             mtd, tp = self.options["method"].split("_")
@@ -233,7 +256,7 @@ class energy_utils:
         except:
             print("Unspecified solvation")
 
-        if bool(options.get("opt")) and (mol_size > 1):
+        if bool(self.options.get("opt")) and (mol_size > 1):
             xtb_options["opt"] = self.options["opt"]
 
         return xtb_options

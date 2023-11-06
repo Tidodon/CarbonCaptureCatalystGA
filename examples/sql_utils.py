@@ -26,8 +26,7 @@ def recover_miscs(miscs_data):
     names, es, coords  = [ v[0] for v in miscs_data], [ v[1] for v in miscs_data], [ v[2] for v in miscs_data]
     miscs_dict = {}
     for name, e in zip(names,es):
-        miscs_dict[name] = e
-    miscs_dict["opt_conformer_coords_of_"+name] = coords
+         miscs_dict[name] = tuple([e, coords])
     return miscs_dict
 
 def build_database(c):
