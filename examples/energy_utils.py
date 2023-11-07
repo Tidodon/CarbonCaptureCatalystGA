@@ -4,6 +4,7 @@
 #Module for recovering and and computing energies.
 import os
 import sys
+import numpy as np
 current_path = os.getcwd() # outputs a string
 
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
@@ -82,12 +83,12 @@ class energy_utils:
         precomputed_misc_confs = []
         precomputed_misc_atoms = []
 
-        if self.misc_results:
-            #precomputed_misc_confs
-            #precomputed_misc_atoms
-            pass
         
         for misc_smile in self.misc_smiles:
+            if self.misc_results:
+                precomputed_misc_confs = self.misc_results[misc_smile][1]
+                precomputed_misc_atoms = self.misc_results[misc_smile][2]
+
             name_energy, name_coords, name_atoms              = self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=precomputed_misc_confs, precomputed_atoms=precomputed_misc_atoms)
             miscs_dict[misc_smile]                            = (name_energy, name_coords, name_atoms)
         return miscs_dict
@@ -126,7 +127,7 @@ class energy_utils:
                  conf_coords = confs
             tot_e += self.weight_energy(conf_coords)
             
-            return tot_e, [conf[1] for conf in conf_coords], [atom.GetSymbol() for atom in Chem.MolFromSmiles(maxsub).GetAtoms()]
+            return tot_e, [conf[1] for conf in conf_coords], [conf[0] for conf in conf_coords]#[atom.GetSymbol() for atom in Chem.MolFromSmiles(maxsub).GetAtoms()]
 
     def weight_energy(self, confs):
         """
@@ -148,7 +149,7 @@ class energy_utils:
         return E/Z
     
     @staticmethod
-    def get_conformers(mol_smile, thresholds=[(9,1.0),(0,0.5)], energy_cutoff=10) -> list:
+    def get_conformers(mol_smile, thresholds=[(9, 1.0),(0, 0.4)], energy_cutoff=10) -> list:
         """
         thresholds: a list of tuples defining cutoffs for conformer generation. I assume they are ordered from largest to smallest.
         First  index: length of the molecules over which threshold applies
@@ -201,9 +202,12 @@ class energy_utils:
         atoms       = []
 
         if precomputed_confs:
-            conformers, atoms = precomputed_confs, precomputed_atoms ##just to keep the ordering
+            conformers, atoms = precomputed_confs, precomputed_atoms[0] ##just to keep the ordering
+            conformers = [ np.array(arr) for arr in conformers]
+            print("Precomputed conformers: ", conformers, atoms)
         else:
             conformers, atoms = self.get_conformers(submol_smile)
+            print("First confoermers: ", conformers, atoms)
         
         if self.options["program"] =="xtb":
             xtb_options = self.prepare_xtb_options(submol_size)
@@ -304,29 +308,37 @@ class energy_utils:
         products = Chem.rdmolops.ReplaceSubstructs(mol=mol, query=patt, replacement=repl)
         products = [Chem.MolFromSmiles(m) for m in set([Chem.MolToSmiles(p) for p in products])]
 
+        precomputed_confs = []
+        precomputed_atoms = []
+
         for prod in products:
             print("Check products ",Chem.MolToSmiles(prod))
             prod_smile = Chem.MolToSmiles(prod)
+            
+            if self.prod_results:
+                _, precomputed_confs, precomputed_atoms = self.prod_results[prod_smile]
 
-            yield [prod_smile, self.compute_and_weight_energy(prod_smile)] 
+            yield {prod_smile: self.compute_and_weight_energy(prod_smile, precomputed_confs=precomputed_confs, precomputed_atoms=precomputed_atoms)}
 
     def compute_amine_products(self):
+
+        cats = {}
         if self.amine_type[0]: # If mol has primary amine
-            pri_cats = [ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0])]
-        else:
-            pri_cats = []
+            for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0]):
+                cats =  cats | prod
+            #[ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0])] x | y
 
         if self.amine_type[1]: # If mol has secondary amine
-            sec_cats = [ prod for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1])]
-        else:
-            sec_cats = []
+            for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1]):
+                cats = cats | prod
 
         if self.amine_type[2]: # If mol has tertiary amine.
-            ter_cats = [ prod for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2])]
-        else:
-            ter_cats = []
-        print("Inside compute products: ", pri_cats, sec_cats, ter_cats)
-        return pri_cats + sec_cats + ter_cats
+            for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2]):
+                cats = cats | prod
+
+        print("Inside compute products: ", cats)
+
+        return cats  #pri_cats | sec_cats | ter_cats
 
 
     
@@ -346,7 +358,7 @@ if __name__ == "__main__":
 
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
-    options=  {"program":"xtb", "opt":True, "method":"gfn_2", "solvation":"alpb", "solvent":"water"}
+    options =  {"program":"xtb", "opt":True, "method":"gfn_2", "solvation":"alpb", "solvent":"water"}
     test = energy_utils(smile="NCCO", options=options, cursor=cursor)
     amine_products_all = test.compute_amine_products()
     print("amine produxt LL", amine_products_all)
