@@ -26,7 +26,10 @@ def compute_dH(smile, list_of_options, cursor):
         if mol_energy_object.reac_results:
             _, reac_confs, reac_atoms = mol_energy_object.reac_results
 
-        reactant_energy = mol_energy_object.compute_and_weight_energy(precomputed_confs=reac_confs, precomputed_atoms=reac_atoms)
+        reactant_energy = sql_utils.check_if_in_db(cursor, smile, method=options["method"], solvation=options["solvation"], table="reactants")
+        
+        if not bool(reactant_energy):
+            reactant_energy = mol_energy_object.compute_and_weight_energy(precomputed_confs=reac_confs, precomputed_atoms=reac_atoms)
 
         product_energies = mol_energy_object.compute_amine_products()
 

@@ -2,6 +2,8 @@
 
 import sqlite3
 import os 
+import csv
+import sql_utils
 current_path = os.getcwd()
 
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
@@ -14,20 +16,32 @@ else:
 
 
 def check_if_miscs_in_db(cursor, method="", solvation=""):
-    query = "SELECT smiles, energy, opt_coords FROM miscs WHERE method=? AND solvation=?"
+    query = "SELECT smiles, energy, opt_coords, atoms_ord FROM miscs WHERE method=? AND solvation=?"
     cursor.execute(query, (method, solvation))
-    miscs_data  = cursor.fetchall()
-    if miscs_data:
-        return recover_miscs(miscs_data)
+    data  = cursor.fetchall()
+    if data:
+        return recover_data(data)
     else:
         return False
     
-def recover_miscs(miscs_data):
-    names, es, coords  = [ v[0] for v in miscs_data], [ v[1] for v in miscs_data], [ v[2] for v in miscs_data]
-    miscs_dict = {}
+def check_if_in_db(cursor, smile, method="", solvation="", table=""):
+   query = f"SELECT smiles, energy, opt_coords, atoms_ord FROM {table} WHERE method=? AND solvation=? AND smiles=?"
+   cursor.execute(query, (method, solvation, smile))
+   data  = cursor.fetchall()
+   if data:
+      return recover_data(data)
+   else:
+      return []
+
+    
+def recover_data(data):
+    names, es, coords, atoms_ord  = data
+    coords     = sql_utils.csv_string_to_opt_coords(coords)
+    atoms_ord  = sql_utils.csv_string_to_atoms_ord(atoms_ord)
+    data_dict  = {}
     for name, e in zip(names,es):
-         miscs_dict[name] = tuple([e, coords])
-    return miscs_dict
+         data_dict[name] = tuple([e, coords, atoms_ord])
+    return data_dict
 
 def build_database(c):
    c.execute("""CREATE TABLE reactants(
@@ -93,5 +107,69 @@ def print_table_contents(cursor, *args, **kwargs):
       v = cursor.fetchall()
       for val in v:
          print(val)
+
+
+
+def opt_coords_to_csv_string(nd_lst):
+   """
+   Turns a 3d array with floats into a csv string.
+   Intended is the turning of the list of conformer xyz coordinates into a saveable csv string.
+   """
+   out = ""
+
+   for sub_arr in nd_lst:
+      for row in sub_arr:
+         row = [str(val) for val in row]
+         out += ",".join(row) + ";"
+      out = out[:-1]
+      out += "_"
+   return out[:-1]
+
+def atoms_ord_to_csv_string(nd_lst):
+   out = ""
+   for row in nd_lst:
+      row = [str(val) for val in row]
+      out += ",".join(row) + "\n"
+   return out[:-1]
+
+def csv_string_to_atoms_ord(csv_string):
+
+   reader = csv.reader(csv_string.split('\n'))
+   return [val[0] for val in reader]
+
+
+def csv_string_to_opt_coords(csv_string, func=float):
+   out = []
+
+   reader = csv.reader(csv_string.split('_'))
+   print("reader", reader)
+   for subarr in reader:
+      subarr  =",".join(subarr)
+      sub_out = []
+      print("subarr", subarr)
+      subarr = subarr.split(";")
+      print(subarr)
+      for row in subarr:
+         row = row.split(",")
+         sub_out.append(list(map(func,[val for val in  row])))
+      out.append(sub_out)
+
+   return out
+
+
 if __name__ == "__main__":
-    pass
+   lst = [[[0,1],[23,-5]], [[3,989],[2322,-100]]]
+   # c.execute("DROP table miscs")
+   # c.execute("DROP table reactants")
+   # c.execute("DROP table products")
+   # stringed_list = opt_coords_to_csv_string(lst)
+   # print(stringed_list)
+   # arred_list = csv_string_to_opt_coords(stringed_list)
+   # print(arred_list)
+   nd_lst = ["A","C", "h", "C"]
+   atoms =  atoms_ord_to_csv_string(nd_lst)
+   print(atoms)
+   atoms_ord = csv_string_to_atoms_ord(atoms)
+   print("atoms_ord:", atoms_ord)
+   # arred_string = csv_string_to_arr(stringed_list)
+   # print(arred_string)

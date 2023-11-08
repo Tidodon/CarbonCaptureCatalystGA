@@ -67,10 +67,11 @@ class energy_utils:
 
         method, solvation = self.options['method'], self.options['solvation']
         miscs_data        = {}
-        misc_check        = sql_utils.check_if_miscs_in_db(self.cursor, method=method, solvation=solvation)
+        misc_check        = sql_utils.check_if_in_db(self.cursor, method=method, solvation=solvation)
 
         if misc_check:
-            miscs_data    = sql_utils.recover_miscs(misc_check) #miscs dict
+            miscs_data    = sql_utils.recover_data(misc_check) #miscs dict
+            self.misc_results = miscs_data
         else:
             miscs_data    = self.compute_miscs()
 
@@ -306,6 +307,7 @@ class energy_utils:
         # Replacement step. It is dependenent on the whether the molecule was sanitized or not.
 
         products = Chem.rdmolops.ReplaceSubstructs(mol=mol, query=patt, replacement=repl)
+
         products = [Chem.MolFromSmiles(m) for m in set([Chem.MolToSmiles(p) for p in products])]
 
         precomputed_confs = []
@@ -325,8 +327,7 @@ class energy_utils:
         cats = {}
         if self.amine_type[0]: # If mol has primary amine
             for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0]):
-                cats =  cats | prod
-            #[ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0])] x | y
+                cats = cats | prod
 
         if self.amine_type[1]: # If mol has secondary amine
             for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1]):
@@ -336,11 +337,7 @@ class energy_utils:
             for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2]):
                 cats = cats | prod
 
-        print("Inside compute products: ", cats)
-
-        return cats  #pri_cats | sec_cats | ter_cats
-
-
+        return cats  
     
 if __name__ == "__main__":
 
