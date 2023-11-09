@@ -13,34 +13,23 @@ elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatal
     database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
 else:
    print("Outside predefined working directories.")
-
-
-def check_if_miscs_in_db(cursor, method="", solvation=""):
-    query = "SELECT smiles, energy, opt_coords, atoms_ord FROM miscs WHERE method=? AND solvation=?"
-    cursor.execute(query, (method, solvation))
-    data  = cursor.fetchall()
-    if data:
-        return recover_data(data)
-    else:
-        return False
     
 def check_if_in_db(cursor, smile, method="", solvation="", table=""):
-   query = f"SELECT smiles, energy, opt_coords, atoms_ord FROM {table} WHERE method=? AND solvation=? AND smiles=?"
-   cursor.execute(query, (method, solvation, smile))
-   data  = cursor.fetchall()
+   query = f"SELECT smiles, energy, opt_coords, atoms_ord FROM {table} WHERE smiles=? AND method=? AND solvation=?"
+   cursor.execute(query, (smile, method, solvation))
+   data  = cursor.fetchone()
    if data:
       return recover_data(data)
    else:
-      return []
+      return False#[]
 
-    
 def recover_data(data):
-    names, es, coords, atoms_ord  = data
+    name, e, coords, atoms_ord  = data
     coords     = sql_utils.csv_string_to_opt_coords(coords)
     atoms_ord  = sql_utils.csv_string_to_atoms_ord(atoms_ord)
     data_dict  = {}
-    for name, e in zip(names,es):
-         data_dict[name] = tuple([e, coords, atoms_ord])
+    #for name, e in zip(names,es):
+    data_dict[name] = tuple([e, coords, atoms_ord])
     return data_dict
 
 def build_database(c):
@@ -49,13 +38,17 @@ def build_database(c):
        smiles text, 
         method text,
         solvation text,
-        energy real
+        energy real,   
+         opt_coords text,
+         atoms_ord text
    )""")
    c.execute("""CREATE TABLE miscs(
-        smiles text, 
-        method text,
-        solvation text,
-        energy real
+         smiles text, 
+         method text,
+         solvation text,
+         energy real,
+         opt_coords text,
+         atoms_ord text
    )""")
    c.execute("""CREATE TABLE products(
           id INTEGER PRIMARY KEY,
@@ -63,6 +56,8 @@ def build_database(c):
           method text,
           solvation text,
           energy real DEFAULT NULL,
+         opt_coords text,
+         atoms_ord text,
           dH real DEFAULT NULL,
           k1 real DEFAULT NULL,
           k2 real DEFAULT NULL,
@@ -74,10 +69,6 @@ def build_database(c):
    c.execute("ALTER TABLE reactants ADD product_3_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
    c.execute("ALTER TABLE reactants ADD comments text")
    c.execute("ALTER TABLE products ADD comments text")
-   c.execute("ALTER TABLE reactants ADD opt_coords BLOB DEFAULT NULL")
-   c.execute("ALTER TABLE miscs ADD opt_coords BLOB DEFAULT NULL")
-   c.execute("ALTER TABLE products ADD opt_coords BLOB DEFAULT NULL")
-
 
 def empty_dbs(cursor, *args, **kwargs):
    ##Possible args in molecules_data.db: reactants, miscs, products.
@@ -156,20 +147,52 @@ def csv_string_to_opt_coords(csv_string, func=float):
 
    return out
 
+def insert_result_to_db(cursor, results, list_of_options):
+   for step, options in zip(results,list_of_options):
+      re, pr, mi = step
+      insert_mols_e_to_db(cursor, re, method=options["method"], solvation=options["solvation"], table="reactants")
+      insert_mols_e_to_db(cursor, pr, method=options["method"], solvation=options["solvation"], table="products")
+      insert_mols_e_to_db(cursor, mi, method=options["method"], solvation=options["solvation"], table="miscs")
+
+def insert_mols_e_to_db(cursor, res, method, solvation, table):
+   for mol, data in res.items():
+      
+      if check_if_in_db(cursor, mol, method=method, solvation=solvation, table=table):
+         continue
+      else:
+         opt_coords = opt_coords_to_csv_string(data[1])
+         atoms_ord = atoms_ord_to_csv_string(data[2])
+         params = (mol, data[0], method, solvation, opt_coords, atoms_ord)
+         query = f"INSERT INTO {table} (smiles, energy, method, solvation, opt_coords, atoms_ord) VALUES(?,?,?,?,?,?)"
+         cursor.execute(query, params)
+
 
 if __name__ == "__main__":
    lst = [[[0,1],[23,-5]], [[3,989],[2322,-100]]]
+   conn = sqlite3.connect(database_path)
+   c = conn.cursor()
+
    # c.execute("DROP table miscs")
    # c.execute("DROP table reactants")
    # c.execute("DROP table products")
+
+   # build_database(c)
+
+   # print_table_contents(c, "miscs", "reactants", "products")
+
    # stringed_list = opt_coords_to_csv_string(lst)
    # print(stringed_list)
    # arred_list = csv_string_to_opt_coords(stringed_list)
    # print(arred_list)
+
    nd_lst = ["A","C", "h", "C"]
    atoms =  atoms_ord_to_csv_string(nd_lst)
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
+
+
    # arred_string = csv_string_to_arr(stringed_list)
    # print(arred_string)
+   conn.commit()
+   conn.close()

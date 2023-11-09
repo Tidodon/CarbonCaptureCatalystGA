@@ -59,8 +59,7 @@ class AmineCatalyst:
 
     def __init__(self, mol: Chem.Mol) -> None:
         self.mol       = mol
-        self.program   = "xtb" # orca or xtb 
-        self.options   = {} # Specify method , solvation, opt, solvent. Depending on program those will be reshaped.
+        self.list_of_options   = [ ]# Specify program, method , solvation, opt, solvent.
         self.score     = math.nan
         self.fitness   = math.nan
         self.timing    = math.nan
@@ -70,7 +69,7 @@ class AmineCatalyst:
         self.amine_type = tuple(True if mol.HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
         self.dHabs = math.nan #Heat of absorbtion
         self.kabs = math.nan #k of reaction limiting step. amine->bicarbonate for tertiary amines
-        self.results = {} #A dictionary with possible keys: "miscs", "reactant", "products", each will be only generated
+        self.results = [] #A dictionary with possible keys: "miscs", "reactant", "products", each will be only generated
         #if the corresponding values are not found in the databse.
 
     @property
@@ -104,231 +103,8 @@ class AmineCatalyst:
         Na = 6.02214076 * 10**23 # 1/mol
         return hartree * joule * Na * 0.001 
     
-    def prepare_xtb_options(self) -> dict:
-        """
-        Build an input dicionary for the xtb_calculate function to perfrom xtb calculations.
-        """
-        xtb_options = {}
-        print("optioNS in prepration method:", self.options)
-        
-        try:
-            mtd, tp = self.options["method"].split("_")
-            xtb_options[mtd]=int(tp)
-        except:
-            print("Unspecified QM method")
+ 
 
-        try:
-            xtb_options[self.options["solvation"]] = self.options["solvent"]
-        except:
-            print("Unspecified solvation")
-
-        try:
-            xtb_options["opt"] = self.options["opt"]
-        except:
-            print("Unspecified optimization")
-
-        try:
-            xtb_options["charge"] = self.options["charge"]
-        except:
-            print("Unspecified charge")
-
-        return xtb_options #
-    
-    def prepare_orca_options(self) -> dict:
-        orca_options = {}
-        try:
-            #mtd, tp = self.options["method"].split("_") ## Probably unnecessary for orca calculations.
-            orca_options[(f'{self.options["method"]}').upper()] = ""
-        except:
-            print("Unspecified QM method")
-
-        try:
-            orca_options[self.options["solvation"].upper()]=self.options["solvent"].lower().capitalize()
-            #options_string += f' {self.options["solvation"]}({self.options["solvent"]})'.lower()
-        except:
-            print("Unspecified solvation")
-
-        if self.options["opt"]:
-            #options_string += ' OPT'
-            orca_options["OPT"] = ""
-        else:
-            print("Unspecified optimization")
-        return orca_options
-    
-    def calculate_energy(self, n_cores):
-        ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
-        # The energy is weighted by the contribution of individual conformers.
-
-        self.mol = Chem.AddHs(Chem.MolFromSmiles(Chem.MolToSmiles(self.mol)))
-        print("Name of mol:", Chem.MolToSmiles(self.mol))
-
-        threshold = 0.5
-        if  Chem.RemoveHs(self.mol).GetNumAtoms() > 9:
-            threshold = 1.0
-
-
-        _ = Chem.rdDistGeom.EmbedMultipleConfs(
-                        self.mol,
-                        clearConfs=True,
-                        # maxAttempts = 10,
-                        numConfs=500,
-                        useRandomCoords=True,
-                        pruneRmsThresh=threshold,
-                        #randomSeed=5
-                    )
-        
-        optimized_confs = AllChem.MMFFOptimizeMoleculeConfs(self.mol, mmffVariant='MMFF94')
-
-
-        ##### Conformer pruning based on whether optimization converged and energy magnitude.
-        num_confs = self.mol.GetNumConformers()
-
-        min_e_conf = min([optimized_confs[i][1] for i in range(num_confs)])
-        for i in range(num_confs-1, -1, -1):
-            #print(optimized_confs[i])
-            if  bool(optimized_confs[i][0]):
-                self.mol.RemoveConformer(i)
-            elif (optimized_confs[i][1] - min_e_conf) > 10:
-                #print((optimized_confs[i][1] - min_e_conf))
-                self.mol.RemoveConformer(i)
-
-        num_confs = self.mol.GetNumConformers()
-
-
-
-        # Cluster conformers
-        # diffmat = AllChem.GetConformerRMSMatrix(self.mol, prealigned=False)
-        # clt = Butina.ClusterData(diffmat, num_confs, distThresh=0.05,
-        #                      isDistData=True, reordering=True)
-        # # Get unique conformers
-        # best_conformers =[ conformer for conformer in (self.mol).GetConformers()]
-        # centroid_idx = [c[0] for c in clt] # centroid indexes
-        # print(f"Centroids for clustering are {centroid_idx}")
-        # unique_best_conformers = [best_conformers[i] for i in centroid_idx]
-        # print( f"Number of conformers of {Chem.MolToSmiles(self.mol)} post cluster pruning is {len(unique_best_conformers)}.")
-        atoms = [atom.GetSymbol() for atom in self.mol.GetAtoms()]
-        
-        if self.program =="xtb":
-            xtb_options = self.prepare_xtb_options()
-            print("self options: ", self.options)
-            try:
-                xtb_options["charge"] =  self.options.pop("charge")
-            except:
-                xtb_options["charge"] = Chem.rdmolops.GetFormalCharge(self.mol)
-            print("XTB options: ", xtb_options)
-            try:
-                res = [xtb_calculate(atoms=atoms, coords=conformer.GetPositions(), options=xtb_options, n_cores=n_cores) for conformer in (self.mol).GetConformers()]
-                return res
-            except:
-                print("Incorrect termination of XTB.")
-                print(self.smiles, self.options, xtb_options)
-                return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
-
-        elif self.program == "orca":
-            # charge=0
-            # try: 
-            #     charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
-            # except:
-            #     charge = Chem.rdmolops.GetFormalCharge(self.mol)#0
-            charge = Chem.rdmolops.GetFormalCharge(self.mol)
-            orca_options = self.prepare_orca_options()
-            print("orca options: ", orca_options)
-            #### Prepare orca output to same format as xtb output:
-            try:
-                res = [orca_calculate(atoms=atoms, coords=conformer.GetPositions(), options=orca_options, n_cores=n_cores, charge=charge) for conformer in (self.mol).GetConformers()]
-                return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
-            except:
-                print("Incorrect termination of Orca. -> atoms/opt_coords/electronic_energy dict keys don't respond")
-                print(self.smiles, self.options, orca_options)
-                return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
-        else:
-            raise "Incorrect specification of the QM program."
-    
-    def weight_energy(self, confs):
-        # I pre-divide the exponent to get rid of the extraordinarly large exponents. Since all energies are enforced
-        # to be of the similar magnitude.
-        boltz_exponents = [((val[2]-confs[0][2]))/(self.K_B * self.T_K) for val in confs ]
-        print("BOLTZ exponents", boltz_exponents)
-        boltzmann_pop_reactants = [math.exp(-boltz_expon) for boltz_expon in boltz_exponents]
-        print("Check normalization: ", boltzmann_pop_reactants, sum(boltzmann_pop_reactants))
-        return sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])/sum(boltzmann_pop_reactants)
-        
-    def compute_and_weight_energy(self, n_cores):
-        mol_name = Chem.MolToSmiles(self.mol)
-        if "." in mol_name:
-            submols = mol_name.split(".")
-            tot_e = 0
-
-            maxsub = max(submols, key=len) #Picks the largest ionic part of the molecule.
-            conf_coords = []
-
-            for submol in submols:
-                print("SUBMOL: " , submol)
-                sub = AmineCatalyst(Chem.MolFromSmiles(submol))
-                sub.program, sub.options = self.program, copy.copy(self.options)
-                if Chem.MolFromSmiles(submol).GetNumAtoms() == 1 :
-                    print("SUBOPTIONS: ", submol, sub.options)
-                    _ = sub.options.pop("opt")
-                confs = sub.calculate_energy(n_cores=n_cores)
-                if submol == maxsub:
-                    conf_coords = confs
-                tot_e += sub.weight_energy(confs)
-            
-            #Pick largest submol -> under assumption the smaller parts are simple ions.
-            return tot_e, [conf[1] for conf in conf_coords]
-        else:
-            confs = self.calculate_energy(n_cores=n_cores)
-
-            return self.weight_energy(confs), [conf[1] for conf in confs]
-        
-    def cat_products(self, patt, repl, n_cores):
-        """
-        A generator method that gives smiles representation 
-        of the possible product molecules given pattern(patt) 
-        and replacement(repl). It gives energy values for each 
-        of the products. 
-
-        Arguments:
-        patt: recognization pattern given by a mol object 
-        repl: replacement of the pattern, given by a mol object. 
-        """
-
-        # Sanitization step. DO NOT REMOVE. Otherwise Conformer embedding in self.calculate_energy() breaks:
-        self.mol = Chem.MolFromSmiles(Chem.MolToSmiles(self.mol))
-        # Replacement step. It is dependenent on the whether the molecule was sanitized or not.
-        print("Check recognition: ", Chem.MolToSmiles(self.mol),Chem.MolToSmarts(patt),Chem.MolToSmiles(repl))
-
-        products = Chem.rdmolops.ReplaceSubstructs(mol=self.mol, query=patt, replacement=repl)
-
-        products = [Chem.MolFromSmiles(m) for m in set([Chem.MolToSmiles(p) for p in products])]
-
-        print("products in cat_products: ", [Chem.MolToSmiles(p) for p in products])
-        for prod in products:
-            print("Check products ",Chem.MolToSmiles(prod))
-            cat = AmineCatalyst(prod)
-            cat.options = self.options
-            cat.program = self.program
-            #Yields String, tuple of energy and coords:
-            yield [Chem.MolToSmiles(cat.mol), cat.compute_and_weight_energy(n_cores=n_cores)] 
-
-    def compute_amine_products(self, n_cores):
-        if self.amine_type[0]: # If mol has primary amine
-            pri_cats = [ prod for prod in self.cat_products(patt=self.patts[0], repl=self.repls[0], n_cores=n_cores)]
-        else:
-            pri_cats = []
-
-        if self.amine_type[1]: # If mol has secondary amine
-            sec_cats = [ prod for prod in self.cat_products(patt=self.patts[1], repl=self.repls[1], n_cores=n_cores)]
-        else:
-            sec_cats = []
-
-        if self.amine_type[2]: # If mol has tertiary amine.
-            ter_cats = [ prod for prod in self.cat_products(patt=self.patts[2], repl=self.repls[2], n_cores=n_cores)]
-        else:
-            ter_cats = []
-        print("Inside compute products: ", pri_cats, sec_cats, ter_cats)
-        return pri_cats + sec_cats + ter_cats
-    
     @staticmethod
     def chk_conn(conn):
         try:
@@ -347,185 +123,22 @@ class AmineCatalyst:
             envvar_scratch (str, optional): Name of environmental variable pointing to scratch directory. Defaults to 'SCRATCH'.
             scoring_kwargs (dict, optional): Additional keyword agruments parsed to scoring function. Defaults to {}.
         """
-        # TODO: implement scoring function
-        # this is just a placeholder
 
-        ##Check if in database, if yes -> return db values for that mol instead of computing
-
-
-        #Precomputation flags. I assume that the molecules are found in the database. 
-        # If not the flags will be flipped and the computation performed.
-        compute_miscs = False
-        compute_reactant = False
-        compute_products = False
-
-        compute_dG1 = False
-        compute_dG2 = False
-        compute_dG3 = False
-
-
-        results_dict = {}
-
-        CO2_energy  = 0
-        H2O_energy  = 0
-        OCOO_energy = 0
-
-        method, solvation = self.options['method'], self.options['solvation']
-        CO2_smiles, H2O_smiles, OCOO_smiles = "O=C=O", "[H]O[H]", "[H]OC(=O)[O-]" # "O", "O=C([O-])O"
-        
-
-
-        reactant_smiles = Chem.MolToSmiles(self.mol)
-        rea_id = None
-        reactant_energy = 0
-
-        product_1_id, product_2_id, product_3_id = None, None, None
-        prods = []#None for _ in range(3)]## Hardcoded number of possible products.
-        prod_ids = [None for _ in range(3)]
 
         conn = sqlite3.connect(database_path)
         print("Is calculate_score connected to database?", AmineCatalyst.chk_conn(conn))
         c = conn.cursor()
         
         
-        
-        #####
-        ##### CHECK DB FOR CO2, H2O, OCOO energies given the computation method. If not found compute them and input to database.
-        #####
+        self.results = dH_utils.compute_dH_data(cursor=c, smile=self.smiles, list_of_options=self.list_of_options)
 
+        reactant_energy, product_energies, miscs = self.results[-1]
 
-
-        try:
-            query = "SELECT smiles, energy FROM miscs WHERE method=? AND solvation=?"
-            c.execute(query, (method, solvation))
-            miscs_data  = c.fetchall()
-            names, es   = [ v[0] for v in miscs_data], [ v[1] for v in miscs_data]
-            CO2_energy  = float(es[names.index(CO2_smiles)])
-            H2O_energy  = float(es[names.index(H2O_smiles)])
-            OCOO_energy = float(es[names.index(OCOO_smiles)])
-            print("Miscs energies test: ", CO2_energy,H2O_energy,OCOO_energy)
-        except:
-            compute_miscs = True
-
-        try: 
-            
-            c.execute("SELECT id, energy, product_1_id, product_2_id, product_3_id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles,method, solvation))
-            reacs_data  = c.fetchone() #
-            rea_id, reactant_energy, product_1_id, product_2_id, product_3_id = reacs_data
-            prod_ids = [product_1_id, product_2_id, product_3_id]
-            print("Reactant recovery test: ", rea_id, reactant_energy, product_1_id, product_2_id, product_3_id)
-            print("Successful unpacking of reactant row")
-            ### If the data reading step fails compute the reactant value and insert it to database.
-
-        except:
-            compute_reactant = True
-
-        #### After reading from reactants there were no pointers to any products, i.e. they are not there.
-        if all(val is None for val in prod_ids):
-            compute_products = True
-        else:
-            for prod_id in [product_1_id, product_2_id, product_3_id]:
-                print("PROD ID: " , prod_id)
-                if prod_id is not None:
-                    query = "SELECT * FROM products WHERE id=?"
-                    params = [str(prod_id)]
-                    c.execute(query, params)
-                    pro = c.fetchone()
-                    prods.append(tuple([pro[1], pro[4], pro[5], pro[6], pro[7]])) ## [1] : smiles, [4] : computed_energy, [5:7] dG's
-        print("prods after retrieve loop: ", prods)
-
-
-        #####Computation blocks.
-        if compute_miscs:
-            print("Miscallenous molecules not in database. Computing and adding to database now...")
-            miscs_lst =[]
-            for name in [CO2_smiles, H2O_smiles, OCOO_smiles]:
-                # charge = 0
-                # if name == OCOO_smiles:
-                #     charge = -1
-                name_mol         = AmineCatalyst(Chem.MolFromSmiles(name))
-                name_mol.program = self.program
-                name_mol.options = self.options
-                print("name_mol options: ", name_mol.options)
-                name_energy, name_coords = name_mol.compute_and_weight_energy(n_cores=n_cores)#name_mol.weight_energy(confs_e)
-
-                #### Temporary ugly block for misc energy values.
-                if name == CO2_smiles:
-                    CO2_energy = name_energy
-                if name == H2O_smiles:
-                    H2O_energy = name_energy
-                if name == OCOO_smiles:
-                    OCOO_energy = name_energy
-                miscs_lst.append([name_mol, name_energy, name_coords])
-            results_dict["miscs"] = miscs_lst
-                
-        if compute_reactant:
-            
-            reactant_energy, reactant_coords = self.compute_and_weight_energy(n_cores=n_cores)
-            print("inside except reactant energy: ", reactant_energy)
-            results_dict["reactant"] = [reactant_energy, reactant_coords]
-
-        if compute_products:
-
-            ### Compute primary/secondary/tertiary amine protonation product.
-            ################################################
-            amine_products_all = self.compute_amine_products(n_cores=n_cores)
-            ################################################
-            
-
-            ### Just for information -> If it gets shown often I will need to introduce more product id's
-            if len(amine_products_all) > 3:
-                print("More than 3 possible protonation sites.")
-
-            for prod in amine_products_all:
-                prods.append(prod)
-            results_dict["products"] = prods
-            
-        #### Check that all energies are not None
-        ##### Compute dH value for each of the products.
-
-        dHs = []
-        for amine_product in prods:
-            print("AMINE  PRODUCXT", amine_product)
-            amine_product_energy = amine_product[1] # 1 element on second index is the list of conformer coordinates.
-            if amine_product is None:
-                continue
-            eles = [ amine_product_energy, OCOO_energy, reactant_energy, CO2_energy, H2O_energy]
-            ele_names = [ amine_product[0], OCOO_smiles, Chem.MolToSmiles(self.mol), CO2_smiles, H2O_smiles]
-
-            #####CHECK for correct computation and assigning of values.
-            for ele, ele_name in zip(eles, ele_names):
-                if ele is math.nan:
-                    print("This is NaN: ", ele_name, ele)
-
-            amine_product_name = Chem.MolToSmiles(Chem.MolFromSmiles(amine_product[0]))
-            products = amine_product_energy + OCOO_energy
-            reactants = reactant_energy + CO2_energy + H2O_energy
-            
-            dHs.append([amine_product_name, AmineCatalyst.hartree_to_kjmol(abs(products - reactants))])
-
-        ###### Compute k  #######
-
-        #dG = compute_dG(mol, dG)
-        
-
-
-
-
-
-
-
-
-
+        dHs = dH_utils.compute_dH_list(smile=self.smiles, reactant_energy=reactant_energy, product_energies=product_energies, miscs=miscs)
 
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
         
-        print( reactant_smiles, " -> ", amine_product[0] )
-        print( reactant_energy, " -> ", amine_product_energy )
-
-        self.results = results_dict
-        print("Results dict: ", self.results)
         #results_list = [[reactant_energy], [ ]for prod in prods]
 
         # print("Reactant energy: ", self.weight_energy(reactant_confs))
@@ -557,9 +170,7 @@ class GraphGA(GA):
         mutation_rate,
         scoring_kwargs,
         db_location,
-        comp_program,
         comp_options,
-        miscs,
     ):
         super().__init__(
             mol_options=mol_options,
@@ -569,10 +180,7 @@ class GraphGA(GA):
             db_location=db_location,
             scoring_kwargs=scoring_kwargs,
         )
-        self.comp_program = comp_program
         self.comp_options = comp_options
-        self.miscs =  [] 
-
 
     def make_initial_population(self):
         amine_pops_path = amines_csv_path
@@ -622,15 +230,13 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-
-
-
         for pop in self.population:
             pop.calculate_score()
         #self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
+            sql_utils.insert_result_to_db(cursor, results, list_of_options)
         
         self.add_computed_pops_to_db()
 
@@ -654,6 +260,7 @@ class GraphGA(GA):
         # self.append_results(results, gennum=n + 1, detailed=True)
         
         return results
+
 
     def add_computed_pops_to_db(self,):
 

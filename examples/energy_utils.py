@@ -48,9 +48,9 @@ class energy_utils:
         self.T_K         = 313                                   # Kelvin
         self.n_cores     = 1                                     # Cores to be used in the computation.
         self.amine_type = tuple(True if Chem.MolFromSmiles(self.smile).HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
-        self.misc_results = []
-        self.reac_results = []
-        self.prod_results = []
+        self.misc_results = {}
+        self.reac_results = {}
+        self.prod_results = {}
 
     @staticmethod
     def hartree_to_kjmol(hartree) -> float:
@@ -65,36 +65,13 @@ class energy_utils:
         database if precomputed or 
         """
 
-        method, solvation = self.options['method'], self.options['solvation']
-        miscs_data        = {}
-        misc_check        = sql_utils.check_if_in_db(self.cursor, method=method, solvation=solvation)
 
-        if misc_check:
-            miscs_data    = sql_utils.recover_data(misc_check) #miscs dict
-            self.misc_results = miscs_data
-        else:
-            miscs_data    = self.compute_miscs()
-
-        return miscs_data
-
-    def compute_miscs(self):
-
-        miscs_dict = {}
-
-        precomputed_misc_confs = []
-        precomputed_misc_atoms = []
-
-        
         for misc_smile in self.misc_smiles:
-            if self.misc_results:
-                precomputed_misc_confs = self.misc_results[misc_smile][1]
-                precomputed_misc_atoms = self.misc_results[misc_smile][2]
+            self.misc_results    =  self.misc_results| self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=[], precomputed_atoms=[], table="miscs")
+        
+        return self.misc_results
 
-            name_energy, name_coords, name_atoms              = self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=precomputed_misc_confs, precomputed_atoms=precomputed_misc_atoms)
-            miscs_dict[misc_smile]                            = (name_energy, name_coords, name_atoms)
-        return miscs_dict
-
-    def compute_and_weight_energy(self, mol= "", separate=True, precomputed_confs=[], precomputed_atoms=[]):
+    def compute_and_weight_energy(self, mol= "", separate=True, precomputed_confs=[], precomputed_atoms=[], table=""):
         """
         Overhead to deal with potential ionic compounds and compute their energies and coordinates.
         
@@ -104,6 +81,11 @@ class energy_utils:
         - total energy boltzmann energy weighted by Boltzmann factors
         - list of conformer coordinates, if the compound was ionic only the largest part is retained here.
         """
+
+        mol_check = sql_utils.check_if_in_db(cursor=self.cursor, smile=mol, method=self.options["method"], solvation=self.options["solvation"], table=table)
+        if mol_check:
+            print("Retrieveing energy!")
+            return mol_check
 
         if not mol:
             if "." in self.smile:
@@ -127,8 +109,8 @@ class energy_utils:
             if sub_smile == maxsub:
                  conf_coords = confs
             tot_e += self.weight_energy(conf_coords)
-            
-            return tot_e, [conf[1] for conf in conf_coords], [conf[0] for conf in conf_coords]#[atom.GetSymbol() for atom in Chem.MolFromSmiles(maxsub).GetAtoms()]
+
+            return { mol : (tot_e, [conf[1] for conf in conf_coords], [conf[0] for conf in conf_coords])}#[atom.GetSymbol() for atom in Chem.MolFromSmiles(maxsub).GetAtoms()]
 
     def weight_energy(self, confs):
         """
@@ -320,7 +302,7 @@ class energy_utils:
             if self.prod_results:
                 _, precomputed_confs, precomputed_atoms = self.prod_results[prod_smile]
 
-            yield {prod_smile: self.compute_and_weight_energy(prod_smile, precomputed_confs=precomputed_confs, precomputed_atoms=precomputed_atoms)}
+            yield self.compute_and_weight_energy(prod_smile, precomputed_confs=precomputed_confs, precomputed_atoms=precomputed_atoms, table="products")
 
     def compute_amine_products(self):
 
@@ -357,9 +339,22 @@ if __name__ == "__main__":
     cursor = conn.cursor()
     options =  {"program":"xtb", "opt":True, "method":"gfn_2", "solvation":"alpb", "solvent":"water"}
     test = energy_utils(smile="NCCO", options=options, cursor=cursor)
-    amine_products_all = test.compute_amine_products()
-    print("amine produxt LL", amine_products_all)
-    print("Computed energy of NCCO: ", test.compute_and_weight_energy())
+    out = test.compute_and_weight_energy(mol="NCCO", table="reactants")
+    amineprot = test.compute_amine_products()
+
+    print(amineprot)
+
+    lst = [[[2,3.5],[45,2]]]
+    stringed_list = sql_utils.opt_coords_to_csv_string(lst)
+    atoms= ["A", "B"]
+    atoms_ord = sql_utils.atoms_ord_to_csv_string(atoms)
+
+    # params=("[NH3+]CCO","-14.9303","gfn_2", "alpb", stringed_list, atoms_ord)
+    # cursor.execute("INSERT INTO products (smiles, energy, method, solvation, opt_coords, atoms_ord) VALUES(?,?,?,?,?,?)", params)
+
+    # amine_products_all = test.compute_amine_products()
+    # print("amine produxt LL", amine_products_all)
+    # print("Computed energy of NCCO: ", test.compute_and_weight_energy())
 
     conn.commit()
     conn.close()
