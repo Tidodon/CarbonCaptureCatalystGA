@@ -99,8 +99,6 @@ def print_table_contents(cursor, *args, **kwargs):
       for val in v:
          print(val)
 
-
-
 def opt_coords_to_csv_string(nd_lst):
    """
    Turns a 3d array with floats into a csv string.
@@ -110,16 +108,17 @@ def opt_coords_to_csv_string(nd_lst):
 
    for sub_arr in nd_lst:
       for row in sub_arr:
-         row = [str(val) for val in row]
+         row  = [str(val) for val in row]
          out += ",".join(row) + ";"
-      out = out[:-1]
+
+      out  = out[:-1]
       out += "_"
    return out[:-1]
 
 def atoms_ord_to_csv_string(nd_lst):
    out = ""
    for row in nd_lst:
-      row = [str(val) for val in row]
+      row  = [str(val) for val in row]
       out += ",".join(row) + "\n"
    return out[:-1]
 
@@ -128,18 +127,17 @@ def csv_string_to_atoms_ord(csv_string):
    reader = csv.reader(csv_string.split('\n'))
    return [val[0] for val in reader]
 
-
 def csv_string_to_opt_coords(csv_string, func=float):
+
    out = []
 
    reader = csv.reader(csv_string.split('_'))
-   print("reader", reader)
+
    for subarr in reader:
-      subarr  =",".join(subarr)
+      subarr  = ",".join(subarr)
+      subarr  = subarr.split(";")
       sub_out = []
-      print("subarr", subarr)
-      subarr = subarr.split(";")
-      print(subarr)
+
       for row in subarr:
          row = row.split(",")
          sub_out.append(list(map(func,[val for val in  row])))
@@ -151,8 +149,8 @@ def insert_result_to_db(cursor, results, list_of_options):
    for step, options in zip(results,list_of_options):
       re, pr, mi = step
       insert_mols_e_to_db(cursor, re, method=options["method"], solvation=options["solvation"], table="reactants")
-      insert_mols_e_to_db(cursor, pr, method=options["method"], solvation=options["solvation"], table="products")
-      insert_mols_e_to_db(cursor, mi, method=options["method"], solvation=options["solvation"], table="miscs")
+      insert_mols_e_to_db(cursor, pr, method=options["method"], solvation=options["solvation"], table="products" )
+      insert_mols_e_to_db(cursor, mi, method=options["method"], solvation=options["solvation"], table="miscs"    )
 
 def insert_mols_e_to_db(cursor, res, method, solvation, table):
    for mol, data in res.items():
@@ -161,9 +159,9 @@ def insert_mols_e_to_db(cursor, res, method, solvation, table):
          continue
       else:
          opt_coords = opt_coords_to_csv_string(data[1])
-         atoms_ord = atoms_ord_to_csv_string(data[2])
-         params = (mol, data[0], method, solvation, opt_coords, atoms_ord)
-         query = f"INSERT INTO {table} (smiles, energy, method, solvation, opt_coords, atoms_ord) VALUES(?,?,?,?,?,?)"
+         atoms_ord  = atoms_ord_to_csv_string( data[2])
+         params     = (mol, data[0], method, solvation, opt_coords, atoms_ord)
+         query      = f"INSERT INTO {table} (smiles, energy, method, solvation, opt_coords, atoms_ord) VALUES(?,?,?,?,?,?)"
          cursor.execute(query, params)
 
 

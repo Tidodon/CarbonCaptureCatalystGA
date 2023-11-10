@@ -67,7 +67,7 @@ class energy_utils:
 
 
         for misc_smile in self.misc_smiles:
-            self.misc_results    =  self.misc_results| self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=[], precomputed_atoms=[], table="miscs")
+            self.misc_results    =  self.misc_results | self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=[], precomputed_atoms=[], table="miscs")
         
         return self.misc_results
 
@@ -87,16 +87,11 @@ class energy_utils:
             print("Retrieveing energy!")
             return mol_check
 
-        if not mol:
-            if "." in self.smile:
-                sub_smiles = self.smile.split(".")
-            else:
-                sub_smiles = [self.smile]
+
+        if "." in mol:
+            sub_smiles = mol.split(".")
         else:
-            if "." in mol:
-                sub_smiles = mol.split(".")
-            else:
-                sub_smiles = [mol]
+            sub_smiles = [mol]
 
 
         tot_e = 0
