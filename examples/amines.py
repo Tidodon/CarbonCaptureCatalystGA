@@ -131,8 +131,9 @@ class AmineCatalyst:
         dHs = dH_utils.compute_dH_list(smile=self.smiles, reactant_energy=reactant_energy, product_energies=product_energies, miscs_energies=miscs)
 
         #### Alternatively could be chosen based on the highest k value.
-        self.dHabs = AmineCatalyst.hartree_to_kjmol(max(dHs, key=lambda x :x[1]))
-        
+        self.dHabs = max(dHs, key=lambda x :x[1])
+
+        #AmineCatalyst.hartree_to_kjmol(
         #results_list = [[reactant_energy], [ ]for prod in prods]
 
         # print("Reactant energy: ", self.weight_energy(reactant_confs))
@@ -321,10 +322,10 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"gbsa", "solvent":"water"}]#,
+    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]#,
                       # {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]
 
-
+    #DFT = 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
         population_size=2,
@@ -353,7 +354,7 @@ if __name__ == "__main__":
     for molecule in results:
         print("molecuel: ", Chem.MolToSmiles(molecule.mol))
         calc_names.append(Chem.MolToSmiles(molecule.mol))
-        calc_dH.append(molecule.dHabs[1])
+        calc_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
     ##########################################################
 
 
