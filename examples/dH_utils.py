@@ -37,10 +37,7 @@ def compute_dH_data(smile, list_of_options, cursor):
 
         results.append([ reactant_energy, product_energies, miscs])
 
-    print("results!: ", results)
-
-    dHs_list = compute_dH_list(smile, reactant_energy, product_energies, miscs)
-
+    #dHs_list = compute_dH_list(smile, reactant_energy, product_energies, miscs)
 
     return results
 

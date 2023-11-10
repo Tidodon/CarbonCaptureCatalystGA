@@ -93,7 +93,6 @@ class energy_utils:
         else:
             sub_smiles = [mol]
 
-
         tot_e = 0
         maxsub = max(sub_smiles, key=len) #Picks the largest ionic part of the molecule or simply the molecule itself if it is not ionic.
         conf_coords = []

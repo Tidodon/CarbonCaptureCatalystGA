@@ -63,6 +63,7 @@ class AmineCatalyst:
         self.score     = math.nan
         self.fitness   = math.nan
         self.timing    = math.nan
+        self.cursor    = None
         self.T_K       = 313 # Kelvin
         self.error     = ""
         self.idx       = (-1, -1)
@@ -104,7 +105,6 @@ class AmineCatalyst:
         return hartree * joule * Na * 0.001 
     
  
-
     @staticmethod
     def chk_conn(conn):
         try:
@@ -114,7 +114,7 @@ class AmineCatalyst:
             return False
         
     def calculate_score(
-        self, n_cores: int = 1, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
+        self, n_cores: int = 4, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
     ):
         """Calculate score of molecule, store in self.score.
 
@@ -123,21 +123,15 @@ class AmineCatalyst:
             envvar_scratch (str, optional): Name of environmental variable pointing to scratch directory. Defaults to 'SCRATCH'.
             scoring_kwargs (dict, optional): Additional keyword agruments parsed to scoring function. Defaults to {}.
         """
-
-
-        conn = sqlite3.connect(database_path)
-        print("Is calculate_score connected to database?", AmineCatalyst.chk_conn(conn))
-        c = conn.cursor()
         
-        
-        self.results = dH_utils.compute_dH_data(cursor=c, smile=self.smiles, list_of_options=self.list_of_options)
+        self.results = dH_utils.compute_dH_data(cursor=self.cursor, smile=self.smiles, list_of_options=self.list_of_options)
 
         reactant_energy, product_energies, miscs = self.results[-1]
 
-        dHs = dH_utils.compute_dH_list(smile=self.smiles, reactant_energy=reactant_energy, product_energies=product_energies, miscs=miscs)
+        dHs = dH_utils.compute_dH_list(smile=self.smiles, reactant_energy=reactant_energy, product_energies=product_energies, miscs_energies=miscs)
 
         #### Alternatively could be chosen based on the highest k value.
-        self.dHabs = max(dHs, key=lambda x :x[1])
+        self.dHabs = AmineCatalyst.hartree_to_kjmol(max(dHs, key=lambda x :x[1]))
         
         #results_list = [[reactant_energy], [ ]for prod in prods]
 
@@ -155,9 +149,6 @@ class AmineCatalyst:
         #order_amine_products(dH, dG) -> top three most reactive. 
 
         ####
-
-        conn.commit()
-        conn.close()
         #logP = Descriptors.MolLogP(self.mol)
         #self.score = logP
 
@@ -171,6 +162,7 @@ class GraphGA(GA):
         scoring_kwargs,
         db_location,
         comp_options,
+        cursor, 
     ):
         super().__init__(
             mol_options=mol_options,
@@ -181,6 +173,7 @@ class GraphGA(GA):
             scoring_kwargs=scoring_kwargs,
         )
         self.comp_options = comp_options
+        self.cursor = cursor
 
     def make_initial_population(self):
         amine_pops_path = amines_csv_path
@@ -189,7 +182,8 @@ class GraphGA(GA):
         mols = [Chem.MolFromSmiles(line.split(",")[0]) for line in lines]
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         for amine in population:
-            amine.program, amine.options = self.comp_program, self.comp_options
+            amine.list_of_options = self.comp_options
+            amine.cursor = self.cursor
         return population
 
     def crossover(self, ind1, ind2):
@@ -231,14 +225,14 @@ class GraphGA(GA):
         print("Population in run: ", self.population)
 
         for pop in self.population:
-            pop.calculate_score()
+             pop.calculate_score()
         #self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
-            sql_utils.insert_result_to_db(cursor, results, list_of_options)
+            sql_utils.insert_result_to_db(cursor=self.cursor, results=pop.results, list_of_options=self.comp_options)
         
-        self.add_computed_pops_to_db()
+        #self.add_computed_pops_to_db()
 
         results = self.population
         # self.db.add_individuals(0, self.population)
@@ -260,55 +254,6 @@ class GraphGA(GA):
         # self.append_results(results, gennum=n + 1, detailed=True)
         
         return results
-
-
-    def add_computed_pops_to_db(self,):
-
-        conn = sqlite3.connect(database_path)
-        c = conn.cursor()
-        
-        print("Did connection to database in ga.add_individuals succeed? :", AmineCatalyst.chk_conn(conn))
-
-        prod_id_col_names = ["product_1_id","product_2_id","product_3_id"]
-        method, solvation = self.population[0].options["method"], self.population[0].options["solvation"]
-        for individual in self.population:
-            if bool(individual.results) == False:
-                continue
-            if "miscs" in individual.results.keys():
-
-                for misc in individual.results["miscs"]:
-                    misc_name, misc_energy= Chem.MolToSmiles(misc[0].mol), misc[1]
-                    params = (misc_name, method, solvation, misc_energy)
-                    print("PARAMS", params)
-                    c.execute("INSERT INTO miscs(smiles, method, solvation, energy) VALUES(?,?,?,?)", params)
- 
-            if "reactant" in individual.results.keys():
-
-                reactant_smiles, reactant_energy = Chem.MolToSmiles(individual.mol) ,individual.results["reactant"]
-                c.execute("INSERT INTO reactants(smiles, method, solvation, energy) VALUES(?,?,?,?)",(reactant_smiles, method, solvation, reactant_energy[0]))
-                c.execute("SELECT id FROM reactants WHERE smiles=? AND method=? AND solvation=?", (reactant_smiles, method, solvation))
-                rea_id = int(c.fetchone()[0])
-                # rea_id, reactant_energy, product_1_id, product_2_id, product_3_id
-            else:
-                rea_id = None
-
-            if "products" in individual.results.keys():
-
-                assert "reactant" in individual.results.keys(),  "Products cannot be inserted if reactant was not."
-                amine_products = individual.results["products"]
-                prod_ids = []
-                prod_id_col_names = prod_id_col_names[:len(amine_products)]
-                for amine_product, prod_id_col_name in zip(amine_products, prod_id_col_names) :
-                    c.execute("INSERT INTO products(smiles,method,solvation, energy, dH, reactant_id) VALUES(?,?,?,?,?,?)", (amine_product[0], method, solvation, amine_product[1][0], individual.dHabs[1], rea_id))
-                    c.execute("SELECT id FROM products WHERE smiles=? AND method=? AND solvation=?", (amine_product[0], method, solvation))
-                    prod_am = int(c.fetchone()[0])
-                    prod_ids.append(prod_am)
-                    query = f'UPDATE reactants SET {prod_id_col_name}=? WHERE id=?'
-                    # print("Check query: ", query)
-                    c.execute(query, ([prod_am, rea_id]))
-
-        conn.commit()
-        conn.close()
     
     @staticmethod
     def plot_dH_vs_dH(exp_dH, calc_dH, options):
@@ -341,8 +286,8 @@ class GraphGA(GA):
         except: 
             figname = "" + ".eps"
         plt.savefig(figname, format='eps')
-        plt.show()
-        plt.close()
+        #plt.show()
+        #plt.close()
 
 if __name__ == "__main__": 
     import numpy as np 
@@ -364,6 +309,8 @@ if __name__ == "__main__":
         print("The path is: ", current_path)
 
 
+    conn = sqlite3.connect(database_path)
+    cursor = conn.cursor()
 
     
     amines = pd.read_csv(amines_csv_path)
@@ -374,22 +321,19 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    comp_program = "xtb"
-    comp_options = {"method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"}
-
-    #comp_program = "orca"
-    #comp_options = {"method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"}
+    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"gbsa", "solvent":"water"}]#,
+                      # {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]
 
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=1,
+        population_size=2,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
         scoring_kwargs={},
-        comp_options=comp_options,
-        comp_program=comp_program
+        comp_options=list_of_options,
+        cursor = cursor,
     )
 
     # m = AmineCatalyst(Chem.MolFromSmiles("[NH3+]CCO"))#112.34863236070932
@@ -424,7 +368,6 @@ if __name__ == "__main__":
 
     dH_df = pd.merge(exp_df, calc_df, on="SMILES")
 
-
     print(dH_df)
 
     #exp_dH = [ v[2] for v in ]
@@ -433,7 +376,7 @@ if __name__ == "__main__":
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
-    GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], comp_options)
+    GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], ga.comp_options[-1])
 
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)
@@ -441,3 +384,6 @@ if __name__ == "__main__":
     # ax.set_ylabel("Max Score")
 
     #plt.savefig("organic.png")
+
+    conn.commit()
+    conn.close()
