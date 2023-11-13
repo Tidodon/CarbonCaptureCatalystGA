@@ -35,22 +35,21 @@ TODO:
 """
 class energy_utils:
 
-    patts = [Chem.MolFromSmarts("[ND1]"),Chem.MolFromSmarts("[ND2]"),Chem.MolFromSmarts("[ND3]")]
-    repls =  [Chem.MolFromSmarts("[NH3+]"),Chem.MolFromSmarts("[NH2+]"),Chem.MolFromSmarts("[NH+]")]#
+    patts                = [Chem.MolFromSmarts("[ND1]"),Chem.MolFromSmarts("[ND2]"),Chem.MolFromSmarts("[ND3]")]
+    repls                = [Chem.MolFromSmarts("[NH3+]"),Chem.MolFromSmarts("[NH2+]"),Chem.MolFromSmarts("[NH+]")]#
     misc_smiles          = ("O=C=O", "[H]O[H]", "[H]OC(=O)[O-]")
     K_B                  = 3.166811563 * math.pow(10,-6)         # E_h/K
     
-    def __init__(self, smile: str, options: dict, cursor: sqlite3.Connection) -> None:
-        self.smile       = smile
-        self.options     = options 
-        self.cursor      = cursor
-
-        self.T_K         = 313                                   # Kelvin
-        self.n_cores     = 1                                     # Cores to be used in the computation.
-        self.amine_type = tuple(True if Chem.MolFromSmiles(self.smile).HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
-        self.misc_results = {}
-        self.reac_results = {}
-        self.prod_results = {}
+    def __init__(self, smile: str, options: dict, database_path: str) -> None:
+        self.smile         = smile
+        self.options       = options 
+        self.database_path = database_path
+        self.T_K           = 313                                   # Kelvin
+        self.n_cores       = 1                                     # Cores to be used in the computation.
+        self.amine_type    = tuple(True if Chem.MolFromSmiles(self.smile).HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
+        self.misc_results  = {}
+        self.reac_results  = {}
+        self.prod_results  = {}
 
     @staticmethod
     def hartree_to_kjmol(hartree) -> float:
@@ -65,13 +64,12 @@ class energy_utils:
         database if precomputed or 
         """
 
-
         for misc_smile in self.misc_smiles:
             self.misc_results    =  self.misc_results | self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=[], precomputed_atoms=[], table="miscs")
         
         return self.misc_results
 
-    def compute_and_weight_energy(self, mol= "", separate=True, precomputed_confs=[], precomputed_atoms=[], table=""):
+    def compute_and_weight_energy(self, mol = "", separate=True, precomputed_confs=[], precomputed_atoms=[], table=""):
         """
         Overhead to deal with potential ionic compounds and compute their energies and coordinates.
         
@@ -82,7 +80,7 @@ class energy_utils:
         - list of conformer coordinates, if the compound was ionic only the largest part is retained here.
         """
 
-        mol_check = sql_utils.check_if_in_db(cursor=self.cursor, smile=mol, method=self.options["method"], solvation=self.options["solvation"], table=table)
+        mol_check = sql_utils.check_if_in_db(database_path=self.database_path, smile=mol, method=self.options["method"], solvation=self.options["solvation"], table=table)
         if mol_check:
             print("Retrieveing energy!")
             return mol_check
@@ -134,9 +132,9 @@ class energy_utils:
 
         Important for larger molecules that easily can have 1000's of conformers.
         """
-        mol = Chem.MolFromSmiles(mol_smile)
+        mol     = Chem.MolFromSmiles(mol_smile)
         molsize = Chem.RemoveHs(mol).GetNumAtoms()
-        mol = Chem.AddHs(mol)
+        mol     = Chem.AddHs(mol)
 
         for threshold in thresholds:
             if threshold[0] < molsize:
@@ -171,7 +169,7 @@ class energy_utils:
         ###Computes an energy for a mol object defined by its SMILES/SMARTS string. 
         # The energy is weighted by the contribution of individual conformers.
 
-        mol = Chem.AddHs(Chem.MolFromSmiles(submol_smile))
+        mol         = Chem.AddHs(Chem.MolFromSmiles(submol_smile))
 
         submol_size = mol.GetNumAtoms()
         
@@ -329,10 +327,9 @@ if __name__ == "__main__":
         print("The path is: ", current_path)
 
 
-    conn = sqlite3.connect(database_path)
-    cursor = conn.cursor()
+
     options =  {"program":"xtb", "opt":True, "method":"gfn_2", "solvation":"alpb", "solvent":"water"}
-    test = energy_utils(smile="NCCO", options=options, cursor=cursor)
+    test = energy_utils(smile="NCCO", options=options, database_path=database_path)
     out = test.compute_and_weight_energy(mol="NCCO", table="reactants")
     amineprot = test.compute_amine_products()
 
@@ -349,6 +346,3 @@ if __name__ == "__main__":
     # amine_products_all = test.compute_amine_products()
     # print("amine produxt LL", amine_products_all)
     # print("Computed energy of NCCO: ", test.compute_and_weight_energy())
-
-    conn.commit()
-    conn.close()

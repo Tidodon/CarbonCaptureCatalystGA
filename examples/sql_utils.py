@@ -70,8 +70,11 @@ def build_database(c):
    c.execute("ALTER TABLE reactants ADD comments text")
    c.execute("ALTER TABLE products ADD comments text")
 
-def empty_dbs(cursor, *args, **kwargs):
+def empty_dbs(database_path, *args, **kwargs):
    ##Possible args in molecules_data.db: reactants, miscs, products.
+   conn = sqlite3.connect(database_path)
+   cursor = conn.cursor()
+
    for arg in args:
       query = f"DELETE FROM {arg}"
       params = []
@@ -82,8 +85,14 @@ def empty_dbs(cursor, *args, **kwargs):
             params.append(f"{item[1]}")
          query = query[:-4]
       cursor.execute(query, params)
+
+   conn.commit()
+   conn.close()
+   
          
-def print_table_contents(cursor, *args, **kwargs):
+def print_table_contents(database_path, *args, **kwargs):
+   conn = sqlite3.connect(database_path)
+   cursor = conn.cursor()
    for arg in args:
       query= f"SELECT * FROM {arg}"
       params = []
@@ -98,6 +107,8 @@ def print_table_contents(cursor, *args, **kwargs):
       v = cursor.fetchall()
       for val in v:
          print(val)
+   conn.commit()
+   conn.close()
 
 def opt_coords_to_csv_string(nd_lst):
    """
@@ -145,14 +156,23 @@ def csv_string_to_opt_coords(csv_string, func=float):
 
    return out
 
-def insert_result_to_db(cursor, results, list_of_options):
+def insert_result_to_db(database_path, results, list_of_options):
+   conn = sqlite3.connect(database_path)
+   cursor = conn.cursor()
+
    for step, options in zip(results,list_of_options):
       re, pr, mi = step
       insert_mols_e_to_db(cursor, re, method=options["method"], solvation=options["solvation"], table="reactants")
       insert_mols_e_to_db(cursor, pr, method=options["method"], solvation=options["solvation"], table="products" )
       insert_mols_e_to_db(cursor, mi, method=options["method"], solvation=options["solvation"], table="miscs"    )
 
-def insert_mols_e_to_db(cursor, res, method, solvation, table):
+   conn.commit()
+   conn.close()
+
+def insert_mols_e_to_db(database_path, res, method, solvation, table):
+   conn = sqlite3.connect(database_path)
+   cursor = conn.cursor()
+
    for mol, data in res.items():
       
       if check_if_in_db(cursor, mol, method=method, solvation=solvation, table=table):
@@ -163,6 +183,9 @@ def insert_mols_e_to_db(cursor, res, method, solvation, table):
          params     = (mol, data[0], method, solvation, opt_coords, atoms_ord)
          query      = f"INSERT INTO {table} (smiles, energy, method, solvation, opt_coords, atoms_ord) VALUES(?,?,?,?,?,?)"
          cursor.execute(query, params)
+
+   conn.commit()
+   conn.close()
 
 
 if __name__ == "__main__":

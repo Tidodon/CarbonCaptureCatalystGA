@@ -6,15 +6,15 @@ import sqlite3
 
 
 
-def compute_dH_data(smile, list_of_options, cursor):
+def compute_dH_data(smile, list_of_options, database_path):
 
     results = []
 
     for options in list_of_options:
         
-        mol_energy_object = energy_utils(smile = smile, options=options, cursor=cursor)
+        mol_energy_object = energy_utils(smile = smile, options=options, database_path=database_path)
 
-        reac_confs, reac_atoms = [],[]
+        reac_confs, reac_atoms = [], []
         ## Assigns the computed data from previous step. 
         if results:
             
@@ -43,6 +43,7 @@ def compute_dH_data(smile, list_of_options, cursor):
 
 
 def compute_dH_list(smile, reactant_energy, product_energies, miscs_energies):
+    
     """
     Generates dHs values given 
     """
@@ -59,20 +60,17 @@ if __name__ == "__main__":
 
 
     database_path = "examples/molecules_data.db"
-    conn = sqlite3.connect(database_path)
-    cursor = conn.cursor()
-    
+
     list_of_options = [{"program":"xtb","method":"gfn_1", "opt":"tight", "solvation":"gbsa", "solvent":"water"},
                        {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]
     smile = "[K+].[O-]C(=O)[C@@H]1CCCN1"
 
-    results = compute_dH_data(smile, list_of_options, cursor)
+    results = compute_dH_data(smile, list_of_options, database_path=database_path)
     # dHs_raw = [dh[1] for dh in dH_list]
     # print("outs ", list(map( energy_utils.hartree_to_kjmol ,dHs_raw)))
     
     
-    sql_utils.insert_result_to_db(cursor, results, list_of_options)
+    sql_utils.insert_result_to_db( results, list_of_options, database_path=database_path)
 
-    sql_utils.print_table_contents(cursor, "miscs", "reactants", "products")
-    conn.commit()
-    conn.close()
+    sql_utils.print_table_contents("miscs", "reactants", "products", database_path=database_path)
+

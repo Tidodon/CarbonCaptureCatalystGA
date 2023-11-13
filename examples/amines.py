@@ -59,11 +59,11 @@ class AmineCatalyst:
 
     def __init__(self, mol: Chem.Mol) -> None:
         self.mol       = mol
-        self.list_of_options   = [ ]# Specify program, method , solvation, opt, solvent.
+        self.list_of_options   = [ ] # Specify program, method , solvation, opt, solvent. One dict of those for each computation step.
+        self.database_path = ""
         self.score     = math.nan
         self.fitness   = math.nan
         self.timing    = math.nan
-        self.cursor    = None
         self.T_K       = 313 # Kelvin
         self.error     = ""
         self.idx       = (-1, -1)
@@ -124,7 +124,7 @@ class AmineCatalyst:
             scoring_kwargs (dict, optional): Additional keyword agruments parsed to scoring function. Defaults to {}.
         """
         
-        self.results = dH_utils.compute_dH_data(cursor=self.cursor, smile=self.smiles, list_of_options=self.list_of_options)
+        self.results = dH_utils.compute_dH_data(database_path=database_path, smile=self.smiles, list_of_options=self.list_of_options)
 
         reactant_energy, product_energies, miscs = self.results[-1]
 
@@ -163,18 +163,18 @@ class GraphGA(GA):
         scoring_kwargs,
         db_location,
         comp_options,
-        cursor, 
+        db_mols_path, 
     ):
         super().__init__(
-            mol_options=mol_options,
-            population_size=population_size,
-            n_generations=n_generations,
-            mutation_rate=mutation_rate,
-            db_location=db_location,
-            scoring_kwargs=scoring_kwargs,
+            mol_options     = mol_options,
+            population_size = population_size,
+            n_generations   = n_generations,
+            mutation_rate   = mutation_rate,
+            db_location     = db_location,
+            scoring_kwargs  = scoring_kwargs,
         )
         self.comp_options = comp_options
-        self.cursor = cursor
+        self.db_mols_path = db_mols_path
 
     def make_initial_population(self):
         amine_pops_path = amines_csv_path
@@ -184,7 +184,7 @@ class GraphGA(GA):
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         for amine in population:
             amine.list_of_options = self.comp_options
-            amine.cursor = self.cursor
+            amine.database_path = self.db_mols_path
         return population
 
     def crossover(self, ind1, ind2):
@@ -212,7 +212,6 @@ class GraphGA(GA):
         except Exception:
             return None
         
-
     def run(self):
         results = []  # here the best individuals of each generation will be stored
         self.print_parameters()
@@ -225,13 +224,13 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-        for pop in self.population:
-             pop.calculate_score()
-        #self.population = self.calculate_scores(self.population, gen_id=0)
+        # for pop in self.population:
+        #      pop.calculate_score()
+        self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
-            sql_utils.insert_result_to_db(cursor=self.cursor, results=pop.results, list_of_options=self.comp_options)
+            sql_utils.insert_result_to_db(database_path=self.db_mols_path, results=pop.results, list_of_options=self.comp_options)
         
         #self.add_computed_pops_to_db()
 
@@ -310,9 +309,6 @@ if __name__ == "__main__":
         print("The path is: ", current_path)
 
 
-    conn = sqlite3.connect(database_path)
-    cursor = conn.cursor()
-
     
     amines = pd.read_csv(amines_csv_path)
     #exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
@@ -325,7 +321,6 @@ if __name__ == "__main__":
     list_of_options = [{"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]#,
                       # {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]
 
-    #DFT = 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
         population_size=2,
@@ -334,7 +329,7 @@ if __name__ == "__main__":
         db_location="organic.sqlite",
         scoring_kwargs={},
         comp_options=list_of_options,
-        cursor = cursor,
+        db_mols_path = database_path
     )
 
     # m = AmineCatalyst(Chem.MolFromSmiles("[NH3+]CCO"))#112.34863236070932
@@ -385,6 +380,3 @@ if __name__ == "__main__":
     # ax.set_ylabel("Max Score")
 
     #plt.savefig("organic.png")
-
-    conn.commit()
-    conn.close()
