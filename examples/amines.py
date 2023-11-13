@@ -224,9 +224,9 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-        # for pop in self.population:
-        #      pop.calculate_score()
-        self.population = self.calculate_scores(self.population, gen_id=0)
+        for pop in self.population:
+            pop.calculate_score()
+        # self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)

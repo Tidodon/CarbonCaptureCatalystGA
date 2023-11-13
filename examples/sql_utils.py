@@ -6,15 +6,9 @@ import csv
 import sql_utils
 current_path = os.getcwd()
 
-if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
-   database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
-
-elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
-    database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
-else:
-   print("Outside predefined working directories.")
-    
-def check_if_in_db(cursor, smile, method="", solvation="", table=""):
+def check_if_in_db(database_path, smile, method="", solvation="", table=""):
+   conn = sqlite3.connect(database_path)
+   cursor = conn.cursor()
    query = f"SELECT smiles, energy, opt_coords, atoms_ord FROM {table} WHERE smiles=? AND method=? AND solvation=?"
    cursor.execute(query, (smile, method, solvation))
    data  = cursor.fetchone()
@@ -157,17 +151,13 @@ def csv_string_to_opt_coords(csv_string, func=float):
    return out
 
 def insert_result_to_db(database_path, results, list_of_options):
-   conn = sqlite3.connect(database_path)
-   cursor = conn.cursor()
-
+   
    for step, options in zip(results,list_of_options):
       re, pr, mi = step
-      insert_mols_e_to_db(cursor, re, method=options["method"], solvation=options["solvation"], table="reactants")
-      insert_mols_e_to_db(cursor, pr, method=options["method"], solvation=options["solvation"], table="products" )
-      insert_mols_e_to_db(cursor, mi, method=options["method"], solvation=options["solvation"], table="miscs"    )
+      insert_mols_e_to_db(database_path, re, method=options["method"], solvation=options["solvation"], table="reactants")
+      insert_mols_e_to_db(database_path, pr, method=options["method"], solvation=options["solvation"], table="products" )
+      insert_mols_e_to_db(database_path, mi, method=options["method"], solvation=options["solvation"], table="miscs"    )
 
-   conn.commit()
-   conn.close()
 
 def insert_mols_e_to_db(database_path, res, method, solvation, table):
    conn = sqlite3.connect(database_path)
@@ -175,7 +165,7 @@ def insert_mols_e_to_db(database_path, res, method, solvation, table):
 
    for mol, data in res.items():
       
-      if check_if_in_db(cursor, mol, method=method, solvation=solvation, table=table):
+      if check_if_in_db(database_path, mol, method=method, solvation=solvation, table=table):
          continue
       else:
          opt_coords = opt_coords_to_csv_string(data[1])
@@ -190,6 +180,15 @@ def insert_mols_e_to_db(database_path, res, method, solvation, table):
 
 if __name__ == "__main__":
    lst = [[[0,1],[23,-5]], [[3,989],[2322,-100]]]
+   database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
+   if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
+      database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
+
+   elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
+      database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
+   else:
+      print("Outside predefined working directories.")
+    
    conn = sqlite3.connect(database_path)
    c = conn.cursor()
 
@@ -211,8 +210,8 @@ if __name__ == "__main__":
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
-
-
+   # empty_dbs(database_path, "reactants", "products")
+   print_table_contents(database_path)
    # arred_string = csv_string_to_arr(stringed_list)
    # print(arred_string)
    conn.commit()
