@@ -210,7 +210,9 @@ class energy_utils:
             #### Prepare orca output to same format as xtb output:
             try:
                 res = [orca_calculate(atoms=atoms, coords=conformer, options=orca_options, n_cores=self.n_cores, charge=charge) for conformer in conformers]
+                #if 'opt_coords' in res[0]:
                 return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
+                    
             except:
                 print("Incorrect recovery of Orca output. -> atoms/opt_coords/electronic_energy dict keys don't respond")
                 print(self.smiles, self.options, orca_options)
@@ -320,8 +322,8 @@ if __name__ == "__main__":
         amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
         database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
     elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
-        amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
-        database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
+        amines_csv_path = "/lustre/hpc/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        database_path = "/lustre/hpc/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
     else:
         print("Path is different than testing or running environemnt")
         print("The path is: ", current_path)

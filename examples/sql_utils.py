@@ -4,7 +4,6 @@ import sqlite3
 import os 
 import csv
 import sql_utils
-current_path = os.getcwd()
 
 def check_if_in_db(database_path, smile, method="", solvation="", table=""):
    conn = sqlite3.connect(database_path)
@@ -180,12 +179,14 @@ def insert_mols_e_to_db(database_path, res, method, solvation, table):
 
 if __name__ == "__main__":
    lst = [[[0,1],[23,-5]], [[3,989],[2322,-100]]]
+   current_path = os.getcwd()
+
    database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
    if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
       database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
 
    elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
-      database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
+      database_path = "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
    else:
       print("Outside predefined working directories.")
     
@@ -211,7 +212,7 @@ if __name__ == "__main__":
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
    # empty_dbs(database_path, "reactants", "products")
-   print_table_contents(database_path)
+   print_table_contents(database_path,"reactants", "products")
    # arred_string = csv_string_to_arr(stringed_list)
    # print(arred_string)
    conn.commit()

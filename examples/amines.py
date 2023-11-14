@@ -11,8 +11,8 @@ import sys
 import os
 
 ### Modules
-import dH_utils
-import sql_utils
+from dH_utils import compute_dH_data, compute_dH_list
+from sql_utils import insert_result_to_db
 #import ts_utils
 
 current_path = os.getcwd() # outputs a string
@@ -31,8 +31,6 @@ else:
 from catalystGA import GA
 from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
-from xtb import xtb_calculate
-from orca import orca_calculate
 import sqlite3
 
 #### TODOS:
@@ -124,11 +122,11 @@ class AmineCatalyst:
             scoring_kwargs (dict, optional): Additional keyword agruments parsed to scoring function. Defaults to {}.
         """
         
-        self.results = dH_utils.compute_dH_data(database_path=database_path, smile=self.smiles, list_of_options=self.list_of_options)
+        self.results = compute_dH_data(database_path=self.database_path, smile=self.smiles, list_of_options=self.list_of_options)
 
         reactant_energy, product_energies, miscs = self.results[-1]
 
-        dHs = dH_utils.compute_dH_list(smile=self.smiles, reactant_energy=reactant_energy, product_energies=product_energies, miscs_energies=miscs)
+        dHs = compute_dH_list(smile=self.smiles, reactant_energy=reactant_energy, product_energies=product_energies, miscs_energies=miscs)
 
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
@@ -143,6 +141,7 @@ class AmineCatalyst:
         #Assign score values based on dH, k, SA
 
         #dH scorings alone.
+
         self.score = self.dHabs[1]
 
         #### Later a reordering code will be added here.
@@ -224,13 +223,13 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-        for pop in self.population:
-            pop.calculate_score()
-        # self.population = self.calculate_scores(self.population, gen_id=0)
+        # for pop in self.population:
+        #     pop.calculate_score()
+        self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
-            sql_utils.insert_result_to_db(database_path=self.db_mols_path, results=pop.results, list_of_options=self.comp_options)
+            insert_result_to_db(database_path=self.db_mols_path, results=pop.results, list_of_options=self.comp_options)
         
         #self.add_computed_pops_to_db()
 
@@ -323,7 +322,7 @@ if __name__ == "__main__":
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=2,
+        population_size=1,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",

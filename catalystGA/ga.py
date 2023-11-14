@@ -84,9 +84,12 @@ class GA(ABC):
             population: List of individuals with scores
         """
         def _wrap_scoring(individual, n_cores, envvar_scratch, scoring_kwargs):
+
             print(f"Scoring individual {individual.idx}")
             print(f"Scoring args: {scoring_kwargs}")
+
             individual.calculate_score(n_cores, envvar_scratch, **scoring_kwargs)
+
             print(individual.score)
             return individual
 
@@ -101,6 +104,7 @@ class GA(ABC):
             slurm_partition=self.config["slurm"]["queue"],
             slurm_array_parallelism=self.config["slurm"]["array_parallelism"],
         )
+
         jobs = executor.map_array(
             _wrap_scoring,
             population,
@@ -122,15 +126,17 @@ class GA(ABC):
                 cat.error = error
             new_population.append(cat)
         population = new_population
+
         for pop in population:
+            print("results inside ga.py", pop.results)
             print("Scores inside ga.py: ", pop.score)
 
         self.sort_population(population, self.maximize_score)
 
-        try:
-            shutil.rmtree(scoring_temp_dir)
-        except FileNotFoundError:
-            pass
+        # try:
+        #     shutil.rmtree(scoring_temp_dir)
+        # except FileNotFoundError:
+        #     pass
 
         return population
 
