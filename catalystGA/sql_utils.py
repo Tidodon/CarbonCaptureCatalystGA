@@ -34,7 +34,7 @@ def build_database(c):
       energy REAL,   
       opt_coords TEXT,
       atoms_ord TEXT,
-      opt INTEGER,
+      opt INTEGER  DEFAULT 0 NOT NULL,
       prev_step TEXT
    )""")
    c.execute("""CREATE TABLE miscs(
@@ -44,7 +44,7 @@ def build_database(c):
          energy REAL,
          opt_coords TEXT,
          atoms_ord TEXT,
-         opt INTEGER,
+         opt INTEGER DEFAULT 0 NOT NULL,
          prev_step TEXT
    )""")
    c.execute("""CREATE TABLE products(
@@ -55,11 +55,12 @@ def build_database(c):
           energy REAL DEFAULT NULL,
           opt_coords TEXT,
           atoms_ord TEXT,
-          opt INTEGER,
+          opt INTEGER DEFAULT 0 NOT NULL,
           dH REAL DEFAULT NULL,
           dG1 REAL DEFAULT NULL,
           dG2 REAL DEFAULT NULL,
-          dG3 REAL DEFAULT NULL   
+          dG3 REAL DEFAULT NULL,
+          prev_step TEXT 
          )""")
    #  reactant_id integer REFERENCES reactants(rowid) ON UPDATE CASCADE
    # c.execute("ALTER TABLE reactants ADD product_1_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
@@ -155,15 +156,31 @@ def csv_string_to_opt_coords(csv_string, func=float):
    return out
 
 def insert_result_to_db(database_path, results, list_of_options):
-   
-   for step, options in zip(results,list_of_options):
+
+   steps = len(list_of_options)
+
+   for step, options, ind in zip(results,list_of_options, range(steps)):
       re, pr, mi = step
-      insert_mols_e_to_db(database_path, re, method=options["method"], solvation=options["solvation"], table="reactants")
-      insert_mols_e_to_db(database_path, pr, method=options["method"], solvation=options["solvation"], table="products" )
-      insert_mols_e_to_db(database_path, mi, method=options["method"], solvation=options["solvation"], table="miscs"    )
 
+      opt = 0
+      if "opt" in options:
+         opt = 1
+      prev_step_string = ""
+      if ind>0:
+         for i in range(ind):
+            prev_step_string += options_dict_to_string(list_of_options[i]) +"\n"
+      prev_step_string = prev_step_string[:-1]
+      insert_mols_e_to_db(database_path, re, method=options["method"], solvation=options["solvation"], opt=opt, table="reactants", prev_step_string=prev_step_string)
+      insert_mols_e_to_db(database_path, pr, method=options["method"], solvation=options["solvation"], opt=opt, table="products" , prev_step_string=prev_step_string)
+      insert_mols_e_to_db(database_path, mi, method=options["method"], solvation=options["solvation"], opt=opt, table="miscs"    , prev_step_string=prev_step_string)
 
-def insert_mols_e_to_db(database_path, res, method, solvation, table):
+def options_dict_to_string(options):
+   options_string = ""
+   for key, value in options.items():
+      options_string += str(key) + "_" + str(value) + "_"
+   return options_string[:-1]
+
+def insert_mols_e_to_db(database_path, res, method, solvation, opt, table, prev_step_string):
    conn = sqlite3.connect(database_path)
    cursor = conn.cursor()
 
@@ -174,13 +191,12 @@ def insert_mols_e_to_db(database_path, res, method, solvation, table):
       else:
          opt_coords = opt_coords_to_csv_string(data[1])
          atoms_ord  = atoms_ord_to_csv_string( data[2])
-         params     = (mol, data[0], method, solvation, opt_coords, atoms_ord)
-         query      = f"INSERT INTO {table} (smiles, energy, method, solvation, opt_coords, atoms_ord) VALUES(?,?,?,?,?,?)"
+         params     = (mol, data[0], method, solvation, opt_coords, atoms_ord, opt, prev_step_string)
+         query      = f"INSERT INTO {table} (smiles, energy, method, solvation, opt_coords, atoms_ord, opt, prev_step) VALUES(?,?,?,?,?,?,?,?)"
          cursor.execute(query, params)
 
    conn.commit()
    conn.close()
-
 
 if __name__ == "__main__":
    lst = [[[0,1],[23,-5]], [[3,989],[2322,-100]]]
@@ -204,7 +220,7 @@ if __name__ == "__main__":
 
    # build_database(c)
 
-   # print_table_contents(c, "miscs", "reactants", "products")
+   print_table_contents(database_path, "miscs", "reactants", "products", solvation="gbsa")
 
    # stringed_list = opt_coords_to_csv_string(lst)
    # print(stringed_list)
@@ -216,8 +232,8 @@ if __name__ == "__main__":
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
-   empty_dbs(database_path, "reactants", "products")
-   print_table_contents(database_path,"reactants", "products")
+   # empty_dbs(database_path, "reactants", "products")
+   # print_table_contents(database_path, "reactants", "products")
    # arred_string = csv_string_to_arr(stringed_list)
    # print(arred_string)
    conn.commit()

@@ -318,9 +318,10 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}]#,
+    list_of_options = [{"program":"xtb","method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"},
+                       {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"gbsa", "solvent":"water"}]
                        #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
-                      # {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]
+                      # 
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
