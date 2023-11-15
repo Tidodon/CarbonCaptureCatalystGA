@@ -3,7 +3,7 @@
 import sqlite3
 import os 
 import csv
-import sql_utils
+import sql_utils as sql_utils
 
 def check_if_in_db(database_path, smile, method="", solvation="", table=""):
    conn = sqlite3.connect(database_path)
@@ -211,7 +211,7 @@ if __name__ == "__main__":
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
-   # empty_dbs(database_path, "reactants", "products")
+   empty_dbs(database_path, "reactants", "products")
    print_table_contents(database_path,"reactants", "products")
    # arred_string = csv_string_to_arr(stringed_list)
    # print(arred_string)

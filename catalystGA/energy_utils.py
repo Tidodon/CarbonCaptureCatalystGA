@@ -192,10 +192,11 @@ class energy_utils:
             try:
                 res = [xtb_calculate(atoms=atoms, coords=conformer, options=xtb_options, n_cores=self.n_cores) for conformer in conformers]
                 return res
+
             except:
                 print("Incorrect termination of XTB.")
                 print(submol_smile, self.options, xtb_options)
-            return [[atoms, mol.GetConformerss()[0].GetPositions(), 1000000]]
+                return [[atoms, mol.GetConformers()[0].GetPositions(), 1000000]]
 
         elif self.options["program"] == "orca":
             # charge=0
@@ -210,8 +211,10 @@ class energy_utils:
             #### Prepare orca output to same format as xtb output:
             try:
                 res = [orca_calculate(atoms=atoms, coords=conformer, options=orca_options, n_cores=self.n_cores, charge=charge) for conformer in conformers]
-                #if 'opt_coords' in res[0]:
-                return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
+                if 'opt_coords' in res[0]:
+                    return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
+                else:
+                    return [[atoms, cf ,v['electronic_energy']] for v, cf in zip(res,conformers)]
                     
             except:
                 print("Incorrect recovery of Orca output. -> atoms/opt_coords/electronic_energy dict keys don't respond")
@@ -348,3 +351,6 @@ if __name__ == "__main__":
     # amine_products_all = test.compute_amine_products()
     # print("amine produxt LL", amine_products_all)
     # print("Computed energy of NCCO: ", test.compute_and_weight_energy())
+
+
+    

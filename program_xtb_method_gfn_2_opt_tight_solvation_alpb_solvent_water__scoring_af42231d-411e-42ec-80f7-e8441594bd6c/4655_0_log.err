@@ -1,0 +1,19 @@
+submitit ERROR (2023-11-15 13:16:13,932) - Submitted job triggered an exception
+Traceback (most recent call last):
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/site-packages/submitit/core/_submit.py", line 11, in <module>
+    submitit_main()
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/site-packages/submitit/core/submission.py", line 72, in submitit_main
+    process_job(args.folder)
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/site-packages/submitit/core/submission.py", line 65, in process_job
+    raise error
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/site-packages/submitit/core/submission.py", line 51, in process_job
+    delayed = utils.DelayedSubmission.load(paths.submitted_pickle)
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/site-packages/submitit/core/utils.py", line 149, in load
+    obj = pickle_load(filepath)
+  File "/opt/anaconda3/envs/CarbonCaptureRDKitEnv/lib/python3.10/site-packages/submitit/core/utils.py", line 226, in pickle_load
+    return pickle.load(ifile)
+ModuleNotFoundError: No module named 'dH_utils'

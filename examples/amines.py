@@ -10,9 +10,7 @@ import copy
 import sys
 import os
 
-### Modules
-from CarbonCapture.GA_playground.CarbonCaptureCatalystGA.catalystGA.dH_utils import compute_dH_data, compute_dH_list
-from CarbonCapture.GA_playground.CarbonCaptureCatalystGA.catalystGA.sql_utils import insert_result_to_db
+
 #import ts_utils
 
 current_path = os.getcwd() # outputs a string
@@ -31,6 +29,9 @@ else:
 from catalystGA import GA
 from catalystGA.reproduction_utils import graph_crossover, graph_mutate
 from catalystGA.utils import MoleculeOptions
+### Modules
+from dH_utils import compute_dH_data, compute_dH_list
+from sql_utils import insert_result_to_db
 import sqlite3
 
 #### TODOS:
@@ -317,7 +318,8 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]#,
+    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"},
+                       {"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
                       # {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]
 
     ga = GraphGA(
