@@ -228,7 +228,7 @@ if __name__ == "__main__":
    # print(arred_list)
 
    nd_lst = ["A","C", "h", "C"]
-   atoms =  atoms_ord_to_csv_string(nd_lst)
+   atoms  =  atoms_ord_to_csv_string(nd_lst)
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
