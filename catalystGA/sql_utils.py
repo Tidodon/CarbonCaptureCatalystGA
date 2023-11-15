@@ -27,41 +27,46 @@ def recover_data(data):
 
 def build_database(c):
    c.execute("""CREATE TABLE reactants(
-        id INTEGER PRIMARY KEY,
-       smiles text, 
-        method text,
-        solvation text,
-        energy real,   
-         opt_coords text,
-         atoms_ord text
+      id INTEGER PRIMARY KEY,
+      smiles TEXT, 
+      method TEXT,
+      solvation TEXT,
+      energy REAL,   
+      opt_coords TEXT,
+      atoms_ord TEXT,
+      opt INTEGER,
+      prev_step TEXT
    )""")
    c.execute("""CREATE TABLE miscs(
-         smiles text, 
-         method text,
-         solvation text,
-         energy real,
-         opt_coords text,
-         atoms_ord text
+         smiles TEXT, 
+         method TEXT,
+         solvation TEXT,
+         energy REAL,
+         opt_coords TEXT,
+         atoms_ord TEXT,
+         opt INTEGER,
+         prev_step TEXT
    )""")
    c.execute("""CREATE TABLE products(
           id INTEGER PRIMARY KEY,
-          smiles text,
-          method text,
-          solvation text,
-          energy real DEFAULT NULL,
-         opt_coords text,
-         atoms_ord text,
-          dH real DEFAULT NULL,
-          k1 real DEFAULT NULL,
-          k2 real DEFAULT NULL,
-          k3 real DEFAULT NULL,
-          reactant_id integer REFERENCES reactants(rowid) ON UPDATE CASCADE
+          smiles TEXT,
+          method TEXT,
+          solvation TEXT,
+          energy REAL DEFAULT NULL,
+          opt_coords TEXT,
+          atoms_ord TEXT,
+          opt INTEGER,
+          dH REAL DEFAULT NULL,
+          dG1 REAL DEFAULT NULL,
+          dG2 REAL DEFAULT NULL,
+          dG3 REAL DEFAULT NULL   
          )""")
-   c.execute("ALTER TABLE reactants ADD product_1_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
-   c.execute("ALTER TABLE reactants ADD product_2_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
-   c.execute("ALTER TABLE reactants ADD product_3_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
-   c.execute("ALTER TABLE reactants ADD comments text")
-   c.execute("ALTER TABLE products ADD comments text")
+   #  reactant_id integer REFERENCES reactants(rowid) ON UPDATE CASCADE
+   # c.execute("ALTER TABLE reactants ADD product_1_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
+   # c.execute("ALTER TABLE reactants ADD product_2_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
+   # c.execute("ALTER TABLE reactants ADD product_3_id INTEGER DEFAULT NULL REFERENCES products(id) ON UPDATE CASCADE")
+   # c.execute("ALTER TABLE reactants ADD comments text")
+   # c.execute("ALTER TABLE products ADD comments text")
 
 def empty_dbs(database_path, *args, **kwargs):
    ##Possible args in molecules_data.db: reactants, miscs, products.

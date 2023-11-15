@@ -224,9 +224,9 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-        # for pop in self.population:
-        #     pop.calculate_score()
-        self.population = self.calculate_scores(self.population, gen_id=0)
+        for pop in self.population:
+            pop.calculate_score()
+        # self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
@@ -318,8 +318,8 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"},
-                       {"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
+    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}]#,
+                       #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
                       # {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"alpb", "solvent":"water"}]
 
     ga = GraphGA(

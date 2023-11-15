@@ -260,7 +260,7 @@ class energy_utils:
         except:
             print("Unspecified solvation")
 
-        if self.options["opt"] and (mol_size > 1):
+        if "opt" in self.options and (mol_size > 1):
             #options_string += ' OPT'
             orca_options["OPT"] = ""
 
