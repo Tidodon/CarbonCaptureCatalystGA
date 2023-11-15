@@ -92,8 +92,12 @@ class GA(ABC):
 
             print(individual.score)
             return individual
+        options_string = ""
+        ops = population[0].list_of_options[0]
+        for key, value in ops.items():
+            options_string += str(key) + "_" + str(value) + "_"
 
-        scoring_temp_dir = self.config["slurm"]["tmp_dir"] + "_" + str(uuid.uuid4())
+        scoring_temp_dir = options_string + self.config["slurm"]["tmp_dir"] + "_" + str(uuid.uuid4())
         executor = submitit.AutoExecutor(
             folder=scoring_temp_dir,
         )

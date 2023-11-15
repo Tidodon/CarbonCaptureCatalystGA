@@ -11,8 +11,8 @@ import sys
 import os
 
 ### Modules
-from dH_utils import compute_dH_data, compute_dH_list
-from sql_utils import insert_result_to_db
+from CarbonCapture.GA_playground.CarbonCaptureCatalystGA.catalystGA.dH_utils import compute_dH_data, compute_dH_list
+from CarbonCapture.GA_playground.CarbonCaptureCatalystGA.catalystGA.sql_utils import insert_result_to_db
 #import ts_utils
 
 current_path = os.getcwd() # outputs a string

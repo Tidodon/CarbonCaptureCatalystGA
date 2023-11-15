@@ -197,7 +197,7 @@ class energy_utils:
                 print(submol_smile, self.options, xtb_options)
             return [[atoms, mol.GetConformerss()[0].GetPositions(), 1000000]]
 
-        elif self.program == "orca":
+        elif self.options["program"] == "orca":
             # charge=0
             # try: 
             #     charge = self.options.pop("charge") #Removes Charge key/value and returns the value to be used in orca_calculate
