@@ -159,7 +159,7 @@ def insert_result_to_db(database_path, results, list_of_options):
 
    steps = len(list_of_options)
 
-   for step, options, ind in zip(results,list_of_options, range(steps)):
+   for step, options, ind in zip(results, list_of_options, range(steps)):
       re, pr, mi = step
 
       opt = 0
@@ -200,16 +200,22 @@ def insert_mols_e_to_db(database_path, res, method, solvation, opt, table, prev_
 
 if __name__ == "__main__":
    lst = [[[0,1],[23,-5]], [[3,989],[2322,-100]]]
+   
    current_path = os.getcwd()
 
-   database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
+   database_path = ""
+   amines_csv_path  = ""
+
+   database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db'
    if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
-      database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
+      database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db'
 
    elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
-      database_path = "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
+      database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/molecules_data.db"
    else:
       print("Outside predefined working directories.")
+
+
     
    conn = sqlite3.connect(database_path)
    c = conn.cursor()
@@ -220,7 +226,7 @@ if __name__ == "__main__":
 
    # build_database(c)
 
-   print_table_contents(database_path, "miscs", "reactants", "products", solvation="gbsa")
+   print_table_contents(database_path, "miscs", "reactants", "products", method="gfn_2")#solvation="gbsa")
 
    # stringed_list = opt_coords_to_csv_string(lst)
    # print(stringed_list)

@@ -297,6 +297,9 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt 
 
     ##Get paths to amines and database.
+    database_path = ""
+    amines_csv_path  = ""
+    
     current_path = os.getcwd()
     if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
         amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
@@ -308,7 +311,6 @@ if __name__ == "__main__":
         print("Path is different than testing or running environemnt")
         print("The path is: ", current_path)
 
-
     
     amines = pd.read_csv(amines_csv_path)
     #exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
@@ -318,8 +320,8 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"},
-                       {"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"gbsa", "solvent":"water"}]
+    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True, "solvation":"gbsa", "solvent":"water"}]#,
+                       #{"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"gbsa", "solvent":"water"}]
                        #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
                       # 
 
