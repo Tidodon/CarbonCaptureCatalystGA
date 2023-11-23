@@ -177,7 +177,7 @@ class energy_utils:
         atoms       = []
 
         if precomputed_confs:
-            conformers, atoms = precomputed_confs, precomputed_atoms[0] ##just to keep the ordering
+            conformers, atoms = precomputed_confs, precomputed_atoms ##just to keep the ordering
             conformers = [ np.array(arr) for arr in conformers]
             print("Precomputed conformers: ", conformers, atoms)
         else:
@@ -218,8 +218,8 @@ class energy_utils:
                     
             except:
                 print("Incorrect recovery of Orca output. -> atoms/opt_coords/electronic_energy dict keys don't respond")
-                print(self.smiles, self.options, orca_options)
-                return [[atoms, (self.mol).GetConformers()[0].GetPositions(), 1000000]]
+                print(self.smile, self.options, orca_options)
+                return [[atoms, mol.GetConformers()[0].GetPositions(), 1000000]]
         else:
             raise "Incorrect specification of the QM program."
         

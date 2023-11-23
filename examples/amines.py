@@ -299,14 +299,14 @@ if __name__ == "__main__":
     ##Get paths to amines and database.
     database_path = ""
     amines_csv_path  = ""
-    
+
     current_path = os.getcwd()
     if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
         amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
-        database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/molecules_data.db'
+        database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db'
     elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
         amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
-        database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/molecules_data.db"
+        database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/molecules_data.db"
     else:
         print("Path is different than testing or running environemnt")
         print("The path is: ", current_path)
@@ -320,14 +320,14 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True, "solvation":"gbsa", "solvent":"water"}]#,
-                       #{"program":"xtb","method":"gfn_2", "opt":"tight", "solvation":"gbsa", "solvent":"water"}]
+    list_of_options = [{"program":"xtb","method":"gfn_1", "opt":True, "solvation":"gbsa", "solvent":"water"},
+                       {"program":"xtb","method":"gfn_2", "solvation":"gbsa", "solvent":"water"}]
                        #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
                       # 
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=1,
+        population_size=2,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
