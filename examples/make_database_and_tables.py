@@ -1,6 +1,6 @@
 import sqlite3
 import os 
-import sql_utils
+import CarbonCapture.GA_playground.CarbonCaptureCatalystGA.catalystGA.sql_utils as sql_utils
 current_path = os.getcwd()
 
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":

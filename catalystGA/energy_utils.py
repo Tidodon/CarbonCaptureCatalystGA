@@ -5,6 +5,7 @@
 import os
 import sys
 import numpy as np
+import copy
 current_path = os.getcwd() # outputs a string
 
 if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
@@ -72,8 +73,10 @@ class energy_utils:
     def compute_and_weight_energy(self, mol = "", separate=True, precomputed_confs=[], precomputed_atoms=[], table=""):
         """
         Overhead to deal with potential ionic compounds and compute their energies and coordinates.
+        If compound is ionic one of the ions has to be a single charged atom.
         
         separate : condition for whether ions should be optimized together or separates NOT implemented yet.
+
 
         Outputs: 
         - total energy boltzmann energy weighted by Boltzmann factors
@@ -82,7 +85,7 @@ class energy_utils:
 
         mol_check = sql_utils.check_if_in_db(database_path=self.database_path, smile=mol, method=self.options["method"], solvation=self.options["solvation"], table=table)
         if mol_check:
-            print("Retrieveing energy!")
+            print("Retrieving energy!")
             return mol_check
 
 
@@ -91,16 +94,19 @@ class energy_utils:
         else:
             sub_smiles = [mol]
 
-        tot_e = 0
-        maxsub = max(sub_smiles, key=len) #Picks the largest ionic part of the molecule or simply the molecule itself if it is not ionic.
+        tot_e       = 0
+        maxsub      = max(sub_smiles, key=len) #Picks the largest ionic part of the molecule or simply the molecule itself if it is not ionic.
         conf_coords = []
 
         for sub_smile in sub_smiles:
 
-            confs = self.calculate_energy(sub_smile, precomputed_confs=precomputed_confs, precomputed_atoms=precomputed_atoms)
+            #confs = self.calculate_energy(sub_smile, precomputed_confs=precomputed_confs, precomputed_atoms=precomputed_atoms)
             if sub_smile == maxsub:
-                 conf_coords = confs
-            tot_e += self.weight_energy(conf_coords)
+                confs = self.calculate_energy(sub_smile, precomputed_confs=precomputed_confs, precomputed_atoms=precomputed_atoms)
+                conf_coords = copy.copy(confs)
+            else:
+                confs= self.calculate_energy(sub_smile)
+            tot_e += self.weight_energy(confs)
 
             return { mol : (tot_e, [conf[1] for conf in conf_coords], [conf[0] for conf in conf_coords])}#[atom.GetSymbol() for atom in Chem.MolFromSmiles(maxsub).GetAtoms()]
 
@@ -112,19 +118,19 @@ class energy_utils:
         Z : Normalization factor from the sum of Boltzmann factors.
         """
 
-        adjustment = confs[0][2] 
+        adjustment              = confs[0][2] 
 
-        boltz_exponents = [((val[2]-adjustment))/(self.K_B * self.T_K) for val in confs ]
+        boltz_exponents         = [((val[2]-adjustment))/(self.K_B * self.T_K) for val in confs ]
 
         boltzmann_pop_reactants = [math.exp(-boltz_exp) for boltz_exp in boltz_exponents]
 
-        Z = sum(boltzmann_pop_reactants)
-        E = sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])
+        Z                       = sum(boltzmann_pop_reactants)
+        E                       = sum([reactant_pop*conf_e[2] for reactant_pop, conf_e in zip(boltzmann_pop_reactants, confs)])
 
         return E/Z
     
     @staticmethod
-    def get_conformers(mol_smile, thresholds=[(9, 1.0),(0, 0.4)], energy_cutoff=10) -> list:
+    def get_conformers(mol_smile, thresholds=[(15,2),(12,1),(0,0.8)], energy_cutoff=10) -> list:
         """
         thresholds: a list of tuples defining cutoffs for conformer generation. I assume they are ordered from largest to smallest.
         First  index: length of the molecules over which threshold applies
@@ -245,7 +251,6 @@ class energy_utils:
 
         return xtb_options
     
-
     def prepare_orca_options(self, mol_size) -> dict:
         orca_options = {}
         try:
@@ -351,6 +356,3 @@ if __name__ == "__main__":
     # amine_products_all = test.compute_amine_products()
     # print("amine produxt LL", amine_products_all)
     # print("Computed energy of NCCO: ", test.compute_and_weight_energy())
-
-
-    

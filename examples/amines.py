@@ -302,10 +302,12 @@ if __name__ == "__main__":
 
     current_path = os.getcwd()
     if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
-        amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines_with_ions.csv"
+        #amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
         database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db'
     elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
-        amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines_with_ions.csv"
+        #amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
         database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/molecules_data.db"
     else:
         print("Path is different than testing or running environemnt")
@@ -327,7 +329,7 @@ if __name__ == "__main__":
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=2,
+        population_size=1,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -344,6 +346,8 @@ if __name__ == "__main__":
     # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
     results = []
+    print(Chem.MolToSmiles(Chem.MolFromSmiles("[K+].[O-]C(=O)[C@@H]1CCCN1")))
+
     results = ga.run()
 
     ##########################################################
