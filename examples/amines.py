@@ -224,9 +224,9 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-        for pop in self.population:
-            pop.calculate_score()
-        # self.population = self.calculate_scores(self.population, gen_id=0)
+        # for pop in self.population:
+        #     pop.calculate_score()
+        self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
@@ -329,7 +329,7 @@ if __name__ == "__main__":
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=1,
+        population_size=32,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -346,33 +346,67 @@ if __name__ == "__main__":
     # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
     results = []
-    print(Chem.MolToSmiles(Chem.MolFromSmiles("[K+].[O-]C(=O)[C@@H]1CCCN1")))
+    #results = ga.run()
 
-    results = ga.run()
+    results_xtb = ga.run()
+
+    list_of_options = [{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
+                      # 
+
+    ga = GraphGA(
+        mol_options=MoleculeOptions(AmineCatalyst),
+        population_size=32,
+        n_generations=1,
+        mutation_rate=0.0,
+        db_location="organic.sqlite",
+        scoring_kwargs={},
+        comp_options=list_of_options,
+        db_mols_path = database_path
+    )
+    results_orca = ga.run()
+
 
     ##########################################################
     ###Temporary code for benchmarking dH computations.#######
     ##########################################################
-    calc_names, calc_dH = [],[]
-    for molecule in results:
-        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-        calc_names.append(Chem.MolToSmiles(molecule.mol))
-        calc_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+
+    # calc_names, calc_dH = [],[]
+    # for molecule in results:
+    #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+    #     calc_names.append(Chem.MolToSmiles(molecule.mol))
+    #     calc_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
     ##########################################################
 
 
     ##########################################################
     ################Plotting preparation.####################
     ##########################################################
-    exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
-    exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
+    # exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
+    # exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
 
-    exp_df = pd.DataFrame({"SMILES":exp_names, "dH_exp":exp_dH})
-    calc_df = pd.DataFrame({"SMILES":calc_names, "dH_calc":calc_dH})
+    # exp_df = pd.DataFrame({"SMILES":exp_names, "dH_exp":exp_dH})
+    # calc_df = pd.DataFrame({"SMILES":calc_names, "dH_calc":calc_dH})
 
-    dH_df = pd.merge(exp_df, calc_df, on="SMILES")
+    xtb_names, xtb_dH = [],[]
+    for molecule in results_xtb:
+        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+        xtb_names.append(Chem.MolToSmiles(molecule.mol))
+        xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
 
-    print(dH_df)
+    xtb_df = pd.DataFrame({"SMILES":xtb_names, "dH_xtb":xtb_dH})
+
+    orca_names, orca_dH = [],[]
+    for molecule in results_orca:
+        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+        orca_names.append(Chem.MolToSmiles(molecule.mol))
+        orca_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+
+    orca_df = pd.DataFrame({"SMILES":orca_names, "dH_orca":orca_dH})
+
+
+    dH_df = pd.merge(xtb_df, orca_df, on="SMILES")
+
+    # print(dH_df)
 
     #exp_dH = [ v[2] for v in ]
 
@@ -380,7 +414,7 @@ if __name__ == "__main__":
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
-    GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], ga.comp_options[-1])
+    GraphGA.plot_dH_vs_dH(dH_df["dH_xtb"], dH_df["dH_orca"], ga.comp_options[-1])
 
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)

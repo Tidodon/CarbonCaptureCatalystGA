@@ -45,7 +45,7 @@ def compute_dH_data(smile, list_of_options, database_path):
 def compute_dH_list(smile, reactant_energy, product_energies, miscs_energies):
     
     """
-    Generates dHs values given 
+    Generates dHs values given dictionaries holding reactant, product and misc molecules information.
     """
 
     reactants = reactant_energy[smile][0] + miscs_energies["[H]O[H]"][0] + miscs_energies["O=C=O"][0]

@@ -1,6 +1,8 @@
 
+#TODO:
+# - Change product mol generation from generate and compute to two separate functions.
 
-
+##
 #Module for recovering and and computing energies.
 import os
 import sys
@@ -188,7 +190,7 @@ class energy_utils:
             print("Precomputed conformers: ", conformers, atoms)
         else:
             conformers, atoms = self.get_conformers(submol_smile)
-            print("First confoermers: ", conformers, atoms)
+            print("First conformers: ", conformers, atoms)
         
         if self.options["program"] =="xtb":
             xtb_options = self.prepare_xtb_options(submol_size)

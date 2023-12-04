@@ -89,7 +89,7 @@ def empty_dbs(database_path, *args, **kwargs):
    conn.close()
    
          
-def print_table_contents(database_path, *args, **kwargs):
+def print_table_contents(database_path, *args, print_data=True, **kwargs):
    conn = sqlite3.connect(database_path)
    cursor = conn.cursor()
    for arg in args:
@@ -104,10 +104,16 @@ def print_table_contents(database_path, *args, **kwargs):
       cursor.execute(query, params)
       print(f"{arg} column names: ", [desc[0] for desc in cursor.description])
       v = cursor.fetchall()
-      for val in v:
-         print(val)
+      if print_data:
+         for val in v:
+            print(val)
+      else:
+         return v
    conn.commit()
    conn.close()
+
+def convert_table_output_into_dict():
+   pass
 
 def opt_coords_to_csv_string(nd_lst):
    """

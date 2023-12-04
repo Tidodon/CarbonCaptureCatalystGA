@@ -19,12 +19,33 @@ ts_dummy = Chem.SDMolSupplier(ts_file, removeHs=False, sanitize=True)[0]
 frag_energies = np.sum([-8.232710038092, -19.734652802142, -32.543971411432])  # 34 atoms
 
 
+def compute_dG(smile, which_step=2, ):
+
+    reactants = ""
+    ts_mol    = ""
+    dG        = 0
+
+    ## prepare ts smiles
+
+    ## preaprae ts input
+
+    #embed ts
+
+    ##prepare reactants input
+
+    #optimize ts and reactants
+
+
+    return dG
+
+
+
 def ts_scoring(cat, idx=(0, 0), ncpus=1, n_confs=10, cleanup=False):
     """Calculates electronic energy difference in kcal/mol between TS and reactants
 
     Args:
         cat (rdkit.Mol): Molecule containing one tertiary amine
-        n_confs (int, optional): Nubmer of confomers used for embedding. Defaults to 10.
+        n_confs (int, optional): Number of confomers used for embedding. Defaults to 10.
         cleanup (bool, optional): Clean up files after calculation.
                                   Defaults to False, needs to be False to work with submitit.
 
