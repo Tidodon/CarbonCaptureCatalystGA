@@ -256,11 +256,18 @@ class GraphGA(GA):
         return results
     
     @staticmethod
-    def plot_dH_vs_dH(exp_dH, calc_dH, options):
+    def plot_dH_vs_dH(exp_dH, calc_dH, options, title="", figname="", xlab="", ylab=""):
         assert type(options) == dict
         plt.scatter(exp_dH, calc_dH, marker="o", color="b")
-        plt.xlabel("Experimental " + r"$ \Delta H $")
-        plt.ylabel("Calculated "   + r"$ \Delta H $")
+        if xlab:
+            plt.xlabel(xlab)
+        else:
+            plt.xlabel("Experimental " + r"$ \Delta H $")
+
+        if ylab: 
+            plt.ylabel(ylab)
+        else:
+            plt.ylabel("Calculated "   + r"$ \Delta H $")
         plt.axline([abs(min(exp_dH + calc_dH)),abs(min(exp_dH+calc_dH))], slope=1)
         slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
         R2 = r**2
@@ -279,12 +286,20 @@ class GraphGA(GA):
         plt.plot([], [], label=f'stderr: {se:.2f}')
         plt.xlim(0,max(exp_dH+calc_dH) )
         plt.ylim(0,max(exp_dH+calc_dH) )
-        plt.title(f"{options['method']} {options['solvation']}")
+        if title:
+            plt.title(title)
+        else:
+            plt.title(f"{options['method']} {options['solvation']}")
         plt.legend()
-        try:
-            figname = "_".join([str(val) for val in options.values()])+".eps"
-        except: 
-            figname = "" + ".eps"
+
+        if figname:
+            ## Use the specified figname.
+            pass
+        else:
+            try:
+                figname = "_".join([str(val) for val in options.values()])+".eps"
+            except: 
+                figname = "" + ".eps"
         plt.savefig(figname, format='eps')
         #plt.show()
         #plt.close()
@@ -369,22 +384,24 @@ if __name__ == "__main__":
     ###Temporary code for benchmarking dH computations.#######
     ##########################################################
 
-    # calc_names, calc_dH = [],[]
-    # for molecule in results:
-    #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-    #     calc_names.append(Chem.MolToSmiles(molecule.mol))
-    #     calc_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+    calc_names, calc_dH = [],[]
+    for molecule in results_orca:
+        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+        calc_names.append(Chem.MolToSmiles(molecule.mol))
+        calc_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
     ##########################################################
 
 
     ##########################################################
     ################Plotting preparation.####################
     ##########################################################
-    # exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
-    # exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
+    exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
+    exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
 
-    # exp_df = pd.DataFrame({"SMILES":exp_names, "dH_exp":exp_dH})
-    # calc_df = pd.DataFrame({"SMILES":calc_names, "dH_calc":calc_dH})
+    exp_df = pd.DataFrame({"SMILES":exp_names, "dH_exp":exp_dH})
+    calc_df = pd.DataFrame({"SMILES":calc_names, "dH_calc":calc_dH})
+
+    dH_df = pd.merge(calc_df, exp_df, on="SMILES")
 
     xtb_names, xtb_dH = [],[]
     for molecule in results_xtb:
@@ -403,7 +420,7 @@ if __name__ == "__main__":
     orca_df = pd.DataFrame({"SMILES":orca_names, "dH_orca":orca_dH})
 
 
-    dH_df = pd.merge(xtb_df, orca_df, on="SMILES")
+    dH_df_orca_xtb = pd.merge(xtb_df, orca_df, on="SMILES")
 
     # print(dH_df)
 
@@ -413,7 +430,11 @@ if __name__ == "__main__":
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
-    GraphGA.plot_dH_vs_dH(dH_df["dH_xtb"], dH_df["dH_orca"], ga.comp_options[-1])
+    GraphGA.plot_dH_vs_dH(dH_df_orca_xtb["dH_xtb"], dH_df_orca_xtb["dH_orca"], ga.comp_options[-1], title="gfn_2(alpb) vs r2SCAN-3c(CPCM)", xlab="xtb", ylab="orca")
+
+
+    GraphGA.plot_dH_vs_dH(dH_df["exp_dH"], dH_df["calc_dH"], ga.comp_options[-1])
+
 
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)
