@@ -302,7 +302,7 @@ class GraphGA(GA):
                 figname = "" + ".eps"
         plt.savefig(figname, format='eps')
         #plt.show()
-        #plt.close()
+        plt.close()
 
 if __name__ == "__main__": 
     import numpy as np 
@@ -433,7 +433,7 @@ if __name__ == "__main__":
     GraphGA.plot_dH_vs_dH(dH_df_orca_xtb["dH_xtb"], dH_df_orca_xtb["dH_orca"], ga.comp_options[-1], title="gfn_2(alpb) vs r2SCAN-3c(CPCM)", xlab="xtb", ylab="orca")
 
 
-    GraphGA.plot_dH_vs_dH(dH_df["exp_dH"], dH_df["calc_dH"], ga.comp_options[-1])
+    GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], ga.comp_options[-1])
 
 
     # fig, ax = plt.subplots()
