@@ -232,7 +232,7 @@ if __name__ == "__main__":
 
    # build_database(c)
 
-   print_table_contents(database_path, "miscs", "reactants", "products", method="gfn_2")#solvation="gbsa")
+   print_table_contents(database_path, "miscs", "reactants", "products", method="gfn_1")#solvation="gbsa")
 
    # stringed_list = opt_coords_to_csv_string(lst)
    # print(stringed_list)
@@ -244,7 +244,7 @@ if __name__ == "__main__":
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
-   # empty_dbs(database_path, "reactants", "products")
+   #empty_dbs(database_path, "miscs","reactants", "products", method="gfn_2")
    # print_table_contents(database_path, "reactants", "products")
    # arred_string = csv_string_to_arr(stringed_list)
    # print(arred_string)

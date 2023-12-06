@@ -225,9 +225,9 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-        # for pop in self.population:
-        #     pop.calculate_score()
-        self.population = self.calculate_scores(self.population, gen_id=0)
+        for pop in self.population:
+            pop.calculate_score()
+        #self.population = self.calculate_scores(self.population, gen_id=0)
         for pop in self.population:
             print(Chem.MolToSmiles(pop.mol))
             print(pop.dHabs)
@@ -318,12 +318,12 @@ if __name__ == "__main__":
 
     current_path = os.getcwd()
     if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
-        amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines_with_ions.csv"
-        #amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        #amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines_with_ions.csv"
+        amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines.csv"
         database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db'
     elif current_path == "/lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA":
-        amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines_with_ions.csv"
-        #amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
+        #amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines_with_ions.csv"
+        amines_csv_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"
         database_path = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/molecules_data.db"
     else:
         print("Path is different than testing or running environemnt")
@@ -338,9 +338,13 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"orca","method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"},
-                       {"program":"orca","method":"cam-b3lyp def2-tzvp", "solvation":"CPCM", "solvent":"water"}]
-                       #]#,
+    list_of_options = [{"program":"xtb","method":"gfn_1", "opt":True,  "solvation":"gbsa", "solvent":"water"},
+                       {"program":"xtb","method":"gfn_2", "solvation":"gbsa", "solvent":"water"}]#,
+
+
+    # list_of_options = [{"program":"orca","method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"},
+    #                    {"program":"orca","method":"cam-b3lyp def2-tzvp", "solvation":"CPCM", "solvent":"water"}]
+    #                    #]#,
                       # {"program":"orca","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
                       #
 
@@ -367,6 +371,8 @@ if __name__ == "__main__":
 
     # results_xtb = ga.run()
 
+    # 
+    #
     # list_of_options = [{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
     #                   # 
 
@@ -436,7 +442,7 @@ if __name__ == "__main__":
 
 
     GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], ga.comp_options[-1])
-    
+
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)
     # ax.set_xlabel("Generation")

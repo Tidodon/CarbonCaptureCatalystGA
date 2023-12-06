@@ -11,11 +11,13 @@ def compute_dH_data(smile, list_of_options, database_path):
     results = []
 
     for options in list_of_options:
+        print("step: ", options)
         
         mol_energy_object = energy_utils(smile = smile, options=options, database_path=database_path)
 
         reac_confs, reac_atoms = [], []
         ## Assigns the computed data from previous step. 
+        print("results: ", results)
         if results:
             
             mol_energy_object.reac_results = results[-1][0]
@@ -25,6 +27,9 @@ def compute_dH_data(smile, list_of_options, database_path):
         if mol_energy_object.reac_results:
             print("mol_energy_object.reac_results: ",  mol_energy_object.reac_results)
             _, reac_confs, reac_atoms = mol_energy_object.reac_results[smile]
+            for i,val in  enumerate(mol_energy_object.reac_results[smile]):
+                print(i, val)
+            print("reac_atoms :", reac_atoms)
 
         ## Outputs a dictionary of reactant data.
         reactant_energy = mol_energy_object.compute_and_weight_energy(mol=smile, precomputed_confs=reac_confs, precomputed_atoms=reac_atoms, table="reactants")

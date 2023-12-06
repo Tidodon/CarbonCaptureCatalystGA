@@ -185,7 +185,7 @@ class energy_utils:
         atoms       = []
 
         if precomputed_confs:
-            conformers, atoms = precomputed_confs, precomputed_atoms ##just to keep the ordering
+            conformers, atoms = precomputed_confs, precomputed_atoms[0] ##just to keep the ordering
             conformers = [ np.array(arr) for arr in conformers]
             print("Precomputed conformers: ", conformers, atoms)
         else:
