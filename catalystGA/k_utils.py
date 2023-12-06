@@ -18,7 +18,6 @@ ts_dummy = Chem.SDMolSupplier(ts_file, removeHs=False, sanitize=True)[0]
 
 frag_energies = np.sum([-8.232710038092, -19.734652802142, -32.543971411432])  # 34 atoms
 
-
 def compute_dG(smile, which_step=2, ):
 
     reactants = ""
@@ -27,7 +26,7 @@ def compute_dG(smile, which_step=2, ):
 
     ## prepare ts smiles
 
-    ## preaprae ts input
+    ## prepare ts input
 
     #embed ts
 

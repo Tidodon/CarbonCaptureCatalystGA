@@ -32,6 +32,7 @@ from catalystGA.utils import MoleculeOptions
 ### Modules
 from dH_utils import compute_dH_data, compute_dH_list
 from sql_utils import insert_result_to_db
+import energy_utils
 import sqlite3
 
 #### TODOS:
@@ -337,13 +338,15 @@ if __name__ == "__main__":
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}]
-                       #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
-                      # 
+    list_of_options = [{"program":"orca","method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"},
+                       {"program":"orca","method":"cam-b3lyp def2-tzvp", "solvation":"CPCM", "solvent":"water"}]
+                       #]#,
+                      # {"program":"orca","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+                      #
 
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=32,
+        population_size=1,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -360,24 +363,24 @@ if __name__ == "__main__":
     # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
     #print(res)
     results = []
-    #results = ga.run()
+    results = ga.run()
 
-    results_xtb = ga.run()
+    # results_xtb = ga.run()
 
-    list_of_options = [{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
-                      # 
+    # list_of_options = [{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
+    #                   # 
 
-    ga = GraphGA(
-        mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=32,
-        n_generations=1,
-        mutation_rate=0.0,
-        db_location="organic.sqlite",
-        scoring_kwargs={},
-        comp_options=list_of_options,
-        db_mols_path = database_path
-    )
-    results_orca = ga.run()
+    # ga = GraphGA(
+    #     mol_options=MoleculeOptions(AmineCatalyst),
+    #     population_size=32,
+    #     n_generations=1,
+    #     mutation_rate=0.0,
+    #     db_location="organic.sqlite",
+    #     scoring_kwargs={},
+    #     comp_options=list_of_options,
+    #     db_mols_path = database_path
+    # )
+    # results_orca = ga.run()
 
 
     ##########################################################
@@ -385,7 +388,7 @@ if __name__ == "__main__":
     ##########################################################
 
     calc_names, calc_dH = [],[]
-    for molecule in results_orca:
+    for molecule in results:
         print("molecuel: ", Chem.MolToSmiles(molecule.mol))
         calc_names.append(Chem.MolToSmiles(molecule.mol))
         calc_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
@@ -403,39 +406,37 @@ if __name__ == "__main__":
 
     dH_df = pd.merge(calc_df, exp_df, on="SMILES")
 
-    xtb_names, xtb_dH = [],[]
-    for molecule in results_xtb:
-        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-        xtb_names.append(Chem.MolToSmiles(molecule.mol))
-        xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+    # xtb_names, xtb_dH = [],[]
+    # for molecule in results_xtb:
+    #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+    #     xtb_names.append(Chem.MolToSmiles(molecule.mol))
+    #     xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
 
-    xtb_df = pd.DataFrame({"SMILES":xtb_names, "dH_xtb":xtb_dH})
+    # xtb_df = pd.DataFrame({"SMILES":xtb_names, "dH_xtb":xtb_dH})
 
-    orca_names, orca_dH = [],[]
-    for molecule in results_orca:
-        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-        orca_names.append(Chem.MolToSmiles(molecule.mol))
-        orca_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+    # orca_names, orca_dH = [],[]
+    # for molecule in results_orca:
+    #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+    #     orca_names.append(Chem.MolToSmiles(molecule.mol))
+    #     orca_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
 
-    orca_df = pd.DataFrame({"SMILES":orca_names, "dH_orca":orca_dH})
+    # orca_df = pd.DataFrame({"SMILES":orca_names, "dH_orca":orca_dH})
 
+    # dH_df_orca_xtb = pd.merge(xtb_df, orca_df, on="SMILES")
 
-    dH_df_orca_xtb = pd.merge(xtb_df, orca_df, on="SMILES")
+    # print(dH_df) 
 
-    # print(dH_df)
-
-    #exp_dH = [ v[2] for v in ]
+    #exp_dH = [ v[2] for v in ] 
 
     #generations = [r[0] for r in results]
     #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
-    GraphGA.plot_dH_vs_dH(dH_df_orca_xtb["dH_xtb"], dH_df_orca_xtb["dH_orca"], ga.comp_options[-1], figname="xtb_vs_orca.eps", title="gfn_2(alpb) vs r2SCAN-3c(CPCM)", xlab="xtb", ylab="orca")
+    # GraphGA.plot_dH_vs_dH(dH_df_orca_xtb["dH_xtb"], dH_df_orca_xtb["dH_orca"], ga.comp_options[-1], figname="xtb_vs_orca.eps", title="gfn_2(alpb) vs r2SCAN-3c(CPCM)", xlab="xtb", ylab="orca")
 
 
     GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], ga.comp_options[-1])
-
-
+    
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)
     # ax.set_xlabel("Generation")
