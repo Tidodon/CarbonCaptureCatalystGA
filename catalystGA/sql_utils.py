@@ -141,7 +141,8 @@ def atoms_ord_to_csv_string(nd_lst):
 def csv_string_to_atoms_ord(csv_string):
 
    reader = csv.reader(csv_string.split('\n'))
-   return [val[0] for val in reader]
+
+   return [val for val in reader]
 
 def csv_string_to_opt_coords(csv_string, func=float):
 
@@ -239,12 +240,12 @@ if __name__ == "__main__":
    # arred_list = csv_string_to_opt_coords(stringed_list)
    # print(arred_list)
 
-   nd_lst = ["A","C", "h", "C"]
+   nd_lst = [["A","C", "h", "C"]]
    atoms  =  atoms_ord_to_csv_string(nd_lst)
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
-   #empty_dbs(database_path, "miscs","reactants", "products", method="gfn_2")
+   empty_dbs(database_path, "miscs","reactants", "products", method="gfn_2")
    # print_table_contents(database_path, "reactants", "products")
    # arred_string = csv_string_to_arr(stringed_list)
    # print(arred_string)
