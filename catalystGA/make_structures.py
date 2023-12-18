@@ -7,7 +7,7 @@ from rdkit.Chem import AllChem
 RDLogger.DisableLog("rdApp.*")
 
 
-def connect_cat_2d(mol_with_dummy, cat):
+def connect_cat_2d(mol_with_dummy, cat, atom_id=0):
     """Replaces Dummy Atom [*] in Mol with Cat via tertiary Amine, return list of all possible regioisomers"""
     dummy = Chem.MolFromSmiles("*")
     mols = []
@@ -20,12 +20,37 @@ def connect_cat_2d(mol_with_dummy, cat):
         mol = AllChem.ReplaceSubstructs(
             mol_with_dummy, dummy, cat, replacementConnectionPoint=amine[0]
         )[0]
+        print(f"After replaceSubstructs {Chem.MolToSmiles(mol)}")
+
         quart_amine = mol.GetSubstructMatch(Chem.MolFromSmarts("[#7X4;H0;D4;!+1]"))[0]
         mol.GetAtomWithIdx(quart_amine).SetFormalCharge(1)
         Chem.SanitizeMol(mol)
         mol.RemoveAllConformers()
         mols.append(mol)
     return mols
+
+# def connect_cat_2d(mol_with_dummy, cat, atom_id, prot_N_patt = ""):
+#     """Replaces Dummy Atom [*] in Mol with Cat via tertiary Amine, return list of all possible regioisomers"""
+#     dummy = Chem.MolFromSmiles("*")
+#     cat = Chem.AddHs(cat)
+#     AllChem.AssignStereochemistry(cat)
+
+#     mol = AllChem.ReplaceSubstructs(
+#             mol_with_dummy, dummy, cat, replacementConnectionPoint=atom_id
+#         )[0]
+    
+#     print(f"After replaceSubstructs {Chem.MolToSmiles(mol)}")
+    
+#     #"[#7X4;H0;D4;!+1]"
+
+#     quart_amine = mol.GetSubstructMatch(Chem.MolFromSmarts(prot_N_patt))[0]
+#     mol.GetAtomWithIdx(quart_amine).SetFormalCharge(1)
+#     Chem.SanitizeMol(mol)
+#     mol.RemoveAllConformers()
+
+#     return mol
+
+
 
 
 def frags2bonded(mol, atoms2join=((1, 11), (11, 29))):
@@ -61,6 +86,9 @@ def ConstrainedEmbedMultipleConfsMultipleFrags(
     pruneRmsThresh=1,
     atoms2join=((1, 11), (11, 29)),
 ):
+
+
+    ### Checks if correctly assembled mol in connect_cat_2d
     match = mol.GetSubstructMatch(core)
     if not match:
         raise ValueError("molecule doesn't match the core")
@@ -75,6 +103,8 @@ def ConstrainedEmbedMultipleConfsMultipleFrags(
         coordMap[idxI] = corePtI
 
     mol_bonded = frags2bonded(mol, atoms2join=atoms2join)
+
+    ##Embed conformers and return the list of their ids.
     cids = AllChem.EmbedMultipleConfs(
         mol=mol_bonded,
         numConfs=numConfs,
@@ -84,6 +114,7 @@ def ConstrainedEmbedMultipleConfsMultipleFrags(
         pruneRmsThresh=pruneRmsThresh,
         useRandomCoords=True,
     )
+
     mol = bonded2frags(mol_bonded, atoms2frag=atoms2join)
     Chem.SanitizeMol(mol)
 
