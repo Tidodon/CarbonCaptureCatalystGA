@@ -73,25 +73,20 @@ def compute_dG(smile, atom_id, which_step=1, amine_type="tert"):
     """
 
     cat = Chem.MolFromSmiles(smile)
+    ts_dummy = Chem.MolFromSmarts("[1*]C(=O)=O")
 
     if amine_type == "tert":
         prot_N_patt = "[#7X4;H0;D4;!+1]"
         ts_dummy = Chem.MolFromSmarts("[1*][H]O[H].C(=O)=O")
-        De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, idx=(0, 0), ncpus=1, n_confs=10, cleanup=False, prot_N_patt = prot_N_patt)
-
-    elif amine_type == "prim" or amine_type == "seco":
-        """
-        Add here step dependent change of ts_dummy and cat.
-        """
-        if amine_type   == "prim":
-            prot_N_patt =  "[#7X4;H2;D2;!+1]"
-        elif amine_type == "seco":
-            prot_N_patt =  "[#7X4;H1;D3;!+1]"
-        ts_dummy = Chem.MolFromSmarts("[1*]C(=O)=O")
-        De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, idx=(0, 0), ncpus=1, n_confs=10, cleanup=False, prot_N_patt = prot_N_patt)
+    elif amine_type   == "prim":
+        prot_N_patt =  "[#7X4;H2;D2;!+1]"
+    elif amine_type == "seco":
+        prot_N_patt =  "[#7X4;H1;D3;!+1]"
 
     else:
         raise Exception("Incorrect amine_type")
+    
+    De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, idx=(0, 0), ncpus=1, n_confs=10, cleanup=False, prot_N_patt = prot_N_patt)
 
     return De, cat3d_geom, ts3d_geom
 
