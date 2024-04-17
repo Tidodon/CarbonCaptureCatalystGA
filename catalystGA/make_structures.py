@@ -7,25 +7,44 @@ from rdkit.Chem import AllChem
 RDLogger.DisableLog("rdApp.*")
 
 
-def connect_cat_2d(mol_with_dummy, cat):
-    """Replaces Dummy Atom [*] in Mol with Cat via tertiary Amine, return list of all possible regioisomers"""
-    dummy = Chem.MolFromSmiles("*")
-    mols = []
+#def connect_cat_2d(mol_with_dummy, cat):
+#    """Replaces Dummy Atom [*] in Mol with Cat via tertiary Amine, return list of all possible regioisomers"""
+#    dummy = Chem.MolFromSmiles("*")
+#    mols = []
+#    cat = Chem.AddHs(cat)
+#    AllChem.AssignStereochemistry(cat)
+#   tert_amines = cat.GetSubstructMatches(Chem.MolFromSmarts("[#7X3;H0;D3;!+1]"))
+#    if len(tert_amines) == 0:
+#        raise Exception(f"{Chem.MolToSmiles(Chem.RemoveHs(cat))} constains no tertiary amine.")
+#    for amine in tert_amines:
+#        mol = AllChem.ReplaceSubstructs(
+#            mol_with_dummy, dummy, cat, replacementConnectionPoint=amine[0]
+#        )[0]
+#        quart_amine = mol.GetSubstructMatch(Chem.MolFromSmarts("[#7X4;H0;D4;!+1]"))[0]
+#        mol.GetAtomWithIdx(quart_amine).SetFormalCharge(1)
+#        Chem.SanitizeMol(mol)
+#        mol.RemoveAllConformers()
+#        mols.append(mol)
+#    return mols
+
+def connect_cat_2d(mol_with_dummy, cat, atom_id, prot_N_patt = ""):
+    """Replaces Dummy Atom [*] in Mol with Cat via amine specified through atom_id, return mol"""
+
+    print("Mol objs: ", mol_with_dummy, cat, atom_id)
+
+    assert cat.GetAtomWithIdx(atom_id).GetSymbol() == "N", "Specified atom_id has to point to a nitrogen atom in catalyst."
+
+    dummy = Chem.MolFromSmarts("[1*]")#7X3;H2;C1")
     cat = Chem.AddHs(cat)
     AllChem.AssignStereochemistry(cat)
-    tert_amines = cat.GetSubstructMatches(Chem.MolFromSmarts("[#7X3;H0;D3;!+1]"))
-    if len(tert_amines) == 0:
-        raise Exception(f"{Chem.MolToSmiles(Chem.RemoveHs(cat))} constains no tertiary amine.")
-    for amine in tert_amines:
-        mol = AllChem.ReplaceSubstructs(
-            mol_with_dummy, dummy, cat, replacementConnectionPoint=amine[0]
+    mol = AllChem.ReplaceSubstructs(
+            mol_with_dummy, dummy, cat, replacementConnectionPoint=atom_id
         )[0]
-        quart_amine = mol.GetSubstructMatch(Chem.MolFromSmarts("[#7X4;H0;D4;!+1]"))[0]
-        mol.GetAtomWithIdx(quart_amine).SetFormalCharge(1)
-        Chem.SanitizeMol(mol)
-        mol.RemoveAllConformers()
-        mols.append(mol)
-    return mols
+
+    mol.RemoveAllConformers()
+
+    return mol
+
 
 
 def frags2bonded(mol, atoms2join=((1, 11), (11, 29))):
@@ -75,6 +94,7 @@ def ConstrainedEmbedMultipleConfsMultipleFrags(
         coordMap[idxI] = corePtI
 
     mol_bonded = frags2bonded(mol, atoms2join=atoms2join)
+    Chem.SanitizeMol(mol_bonded)
     cids = AllChem.EmbedMultipleConfs(
         mol=mol_bonded,
         numConfs=numConfs,

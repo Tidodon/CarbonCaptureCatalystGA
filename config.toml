@@ -1,5 +1,5 @@
 [slurm]
-queue = "kemi1"
+queue = "chem"
 cpus_per_task = 6
 array_parallelism = 100
 timeout_min = 6000

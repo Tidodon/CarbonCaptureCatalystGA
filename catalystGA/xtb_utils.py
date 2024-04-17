@@ -17,6 +17,7 @@ def write_xtb_input_files(fragment, name, destination="."):
     file_paths = []
     for i, conf in enumerate(conformers):
         conf_path = os.path.join(destination, f"conf{i:03d}")
+        print(f"conf_path: {conf_path}")
         os.makedirs(conf_path)
         file_name = f"{name}{i:03d}.xyz"
         file_path = os.path.join(conf_path, file_name)
@@ -97,6 +98,7 @@ def xtb_optimize(
     elif not conformers[-1].Is3D():
         raise Exception("Conformer is not 3D")
 
+
     if not name:
         name = "tmp_" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
 
@@ -109,6 +111,8 @@ def xtb_optimize(
 
     charge = Chem.GetFormalCharge(mol)
     xyz_files = write_xtb_input_files(mol, "xtbmol", destination=os.path.join(scr_dir, name))
+
+   
 
     # xtb options
     XTB_OPTIONS = {
@@ -136,11 +140,13 @@ def xtb_optimize(
     for e, g in results:
         energies.append(e)
         geometries.append(g)
+    
 
     minidx = np.argmin(energies)
-
     # Clean up
     if cleanup:
-        shutil.rmtree(name)
-
+        try:
+            shutil.rmtree(name)
+        except:
+            pass
     return energies[minidx], geometries[minidx]

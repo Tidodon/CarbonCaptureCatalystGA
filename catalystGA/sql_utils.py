@@ -207,13 +207,16 @@ def insert_mols_e_to_db(database_path, res, method, solvation, opt, table, prev_
 
 if __name__ == "__main__":
    lst = [[[0,1],[23,-5]], [[3,989],[2322,-100]]]
-   
+  
+   import pandas as pd
+ 
    current_path = os.getcwd()
 
    database_path = ""
-   amines_csv_path  = ""
+   amines_csv_path  = "/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/examples/data/amines.csv"# ""
 
    database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db'
+
    if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
       database_path = '/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/molecules_data.db'
 
@@ -223,7 +226,7 @@ if __name__ == "__main__":
       print("Outside predefined working directories.")
 
 
-    
+   database_path = '/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/molecules_data.db' 
    conn = sqlite3.connect(database_path)
    c = conn.cursor()
 
@@ -233,21 +236,29 @@ if __name__ == "__main__":
 
    # build_database(c)
 
-   print_table_contents(database_path, "miscs", "reactants", "products", method="gfn_1")#solvation="gbsa")
+   #print_table_contents(database_path, "products",   method="CAM-B3LYP def2-TZVPP")#, method="gfn_1")#solvation="gbsa")
 
    # stringed_list = opt_coords_to_csv_string(lst)
    # print(stringed_list)
    # arred_list = csv_string_to_opt_coords(stringed_list)
    # print(arred_list)
+   amines = pd.read_csv(amines_csv_path)
 
    nd_lst = [["A","C", "h", "C"]]
    atoms  =  atoms_ord_to_csv_string(nd_lst)
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
-   empty_dbs(database_path, "miscs","reactants", "products", method="gfn_2")
-   # print_table_contents(database_path, "reactants", "products")
-   # arred_string = csv_string_to_arr(stringed_list)
+   empty_dbs(database_path, "reactants", "products", method="gfn_2", solvation="alpb")#)solvation="CPCM")#method="CAM-B3LYP def2-TZVP")
+   print_table_contents(database_path, "miscs", "reactants", "products", print_data=True, method="gfn_2", solvation="alpb")#, solvation="CPCM")
+
+
+   
+   #dH_df = pd.merge(calc_df, exp_df, on="SMILES")
+ 
+   r2_string= "0.64297,0.380819,-0.070442;1.144848,-0.923631,-0.207996;2.135425,-1.074344,-0.963625;0.522154,-1.78222,0.456882;1.192306,0.955851,-0.623052"#, 'O,C,O,O,H' 
+   arred_string = csv_string_to_opt_coords(r2_string)
+   print(arred_string)
    # print(arred_string)
    conn.commit()
    conn.close()

@@ -68,7 +68,14 @@ class energy_utils:
         """
 
         for misc_smile in self.misc_smiles:
-            self.misc_results    =  self.misc_results | self.compute_and_weight_energy(mol=misc_smile, precomputed_confs=[], precomputed_atoms=[], table="miscs")
+      
+            precomputed_confs, precomputed_atoms = [], []
+            print("self.misc_results", self.misc_results)
+            if misc_smile in self.misc_results.keys():
+                
+                _, precomputed_confs, precomputed_atoms = self.misc_results[misc_smile]
+                
+            self.misc_results    =  self.misc_results | self.compute_and_weight_energy(mol=misc_smile,precomputed_confs=precomputed_confs, precomputed_atoms=precomputed_atoms, table="miscs")
         
         return self.misc_results
 
@@ -184,6 +191,8 @@ class energy_utils:
         conformers  = []
         atoms       = []
 
+        detailed_options = '%cpcm smd true \n SMDsolvent "water" \n end '
+
         if precomputed_confs:
             conformers, atoms = precomputed_confs, precomputed_atoms[0] ##just to keep the ordering
             conformers = [ np.array(arr) for arr in conformers]
@@ -218,7 +227,7 @@ class energy_utils:
             print("orca options: ", orca_options)
             #### Prepare orca output to same format as xtb output:
             try:
-                res = [orca_calculate(atoms=atoms, coords=conformer, options=orca_options, n_cores=self.n_cores, charge=charge) for conformer in conformers]
+                res = [orca_calculate(atoms=atoms, coords=conformer, options=orca_options, n_cores=self.n_cores, charge=charge, xtra_inp_str=detailed_options) for conformer in conformers]
                 if 'opt_coords' in res[0]:
                     return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
                 else:

@@ -32,9 +32,10 @@ from catalystGA.utils import MoleculeOptions
 ### Modules
 from dH_utils import compute_dH_data, compute_dH_list
 from sql_utils import insert_result_to_db
+from k_utils import list_of_dGs, compute_k_rate_from_dG
 import energy_utils
 import sqlite3
-
+import pandas as pd
 #### TODOS:
 #### - Intermediate naming for prim/seco/tert amines in the scoring function
 #### - dH scoring for A.B ionic compounds. Retrieve reactant data to compute.
@@ -70,6 +71,7 @@ class AmineCatalyst:
         self.amine_type = tuple(True if mol.HasSubstructMatch(patt) else False for patt in self.patts)#Respectively primary/secondary/tertiary amine WITHOUT explicit hydrogens.
         self.dHabs = math.nan #Heat of absorbtion
         self.kabs = math.nan #k of reaction limiting step. amine->bicarbonate for tertiary amines
+        self.dG_lst = []
         self.results = [] #A dictionary with possible keys: "miscs", "reactant", "products", each will be only generated
         #if the corresponding values are not found in the databse.
 
@@ -123,7 +125,6 @@ class AmineCatalyst:
             envvar_scratch (str, optional): Name of environmental variable pointing to scratch directory. Defaults to 'SCRATCH'.
             scoring_kwargs (dict, optional): Additional keyword agruments parsed to scoring function. Defaults to {}.
         """
-        
         self.results = compute_dH_data(database_path=self.database_path, smile=self.smiles, list_of_options=self.list_of_options)
 
         reactant_energy, product_energies, miscs = self.results[-1]
@@ -132,24 +133,30 @@ class AmineCatalyst:
 
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
-
+         
+        
         #AmineCatalyst.hartree_to_kjmol(
         #results_list = [[reactant_energy], [ ]for prod in prods]
 
         # print("Reactant energy: ", self.weight_energy(reactant_confs))
 
         ### Decide on which product to use by k value:
-
+        
+        #print("dG in amines.py", Chem.MolToSmiles(self.mol))
+        dGs = list_of_dGs(Chem.RemoveHs(self.mol)) 
+        print(f"dGs: {dGs}")
+        self.dG_lst = min(dGs, key=lambda x: x[3])
+        #print(self.dG_lst[3], self.T_K)
+        self.kabs = compute_k_rate_from_dG(self.dG_lst[3], self.T_K) 
+        #print("STOPS HERE")
         #Assign score values based on dH, k, SA
 
         #dH scorings alone.
-
-        self.score = self.dHabs[1]
-
+        self.score = self.kabs #self.dHabs[1]
+        
         #### Later a reordering code will be added here.
 
         #order_amine_products(dH, dG) -> top three most reactive. 
-
         ####
         #logP = Descriptors.MolLogP(self.mol)
         #self.score = logP
@@ -225,13 +232,14 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
+        #for pop in self.population:
+        #    pop.calculate_score()
+        self.population = self.calculate_scores(self.population, gen_id=0)
+        print(f"Size of pop: {len(self.population)}")
         for pop in self.population:
-            pop.calculate_score()
-        #self.population = self.calculate_scores(self.population, gen_id=0)
-        for pop in self.population:
-            print(Chem.MolToSmiles(pop.mol))
-            print(pop.dHabs)
-            insert_result_to_db(database_path=self.db_mols_path, results=pop.results, list_of_options=self.comp_options)
+            print("in calculate score:", Chem.MolToSmiles(pop.mol))
+            print(pop.kabs)
+            #insert_result_to_db(database_path=self.db_mols_path, results=pop.results, list_of_options=self.comp_options)
         
         #self.add_computed_pops_to_db()
 
@@ -253,57 +261,57 @@ class GraphGA(GA):
         # self.calculate_fitness(self.population)
         # self.db.add_generation(n + 1, self.population)
         # self.append_results(results, gennum=n + 1, detailed=True)
-        
+    
         return results
-    
-    @staticmethod
-    def plot_dH_vs_dH(exp_dH, calc_dH, options, title="", figname="", xlab="", ylab=""):
-        assert type(options) == dict
-        plt.scatter(exp_dH, calc_dH, marker="o", color="b")
-        if xlab:
-            plt.xlabel(xlab)
-        else:
-            plt.xlabel("Experimental " + r"$ \Delta H $")
 
-        if ylab: 
-            plt.ylabel(ylab)
-        else:
-            plt.ylabel("Calculated "   + r"$ \Delta H $")
-        plt.axline([abs(min(exp_dH + calc_dH)),abs(min(exp_dH+calc_dH))], slope=1)
-        slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
-        R2 = r**2
+@staticmethod
+def plot_dH_vs_dH(exp_dH, calc_dH, options, title="", figname="", xlab="", ylab=""):
+    assert type(options) == dict
+    plt.scatter(exp_dH, calc_dH, marker="o", color="b")
+    if xlab:
+        plt.xlabel(xlab)
+    else:
+        plt.xlabel("Experimental " + r"$ \Delta H $")
 
-        def reg_pnts(x):
-            return slope * x + intercept
-    
-        xs = np.linspace(0,100, 100)
+    if ylab: 
+        plt.ylabel(ylab)
+    else:
+        plt.ylabel("Calculated "   + r"$ \Delta H $")
+    plt.axline([abs(min(exp_dH + calc_dH)),abs(min(exp_dH+calc_dH))], slope=1)
+    slope, intercept, r, p, se = stats.linregress(exp_dH, calc_dH)
+    R2 = r**2
 
-        pnts = [reg_pnts(pnt) for pnt in xs]
-        pnts = [pnt for pnt in pnts if pnt<=max(exp_dH+calc_dH)]# and pnt>min(exp_dH+calc_dH)]
+    def reg_pnts(x):
+        return slope * x + intercept
 
-        plt.plot(xs[:len(pnts)], pnts, ls="--", color="grey", label=f'slope: {slope:.2f}, intercept:+ {intercept:.2f}')
-    
-        plt.plot([], [], label=f'$R^{2}$: {R2:.2f}')
-        plt.plot([], [], label=f'stderr: {se:.2f}')
-        plt.xlim(0,max(exp_dH+calc_dH) )
-        plt.ylim(0,max(exp_dH+calc_dH) )
-        if title:
-            plt.title(title)
-        else:
-            plt.title(f"{options['method']} {options['solvation']}")
-        plt.legend()
+    xs = np.linspace(0,100, 100)
 
-        if figname:
-            ## Use the specified figname.
-            pass
-        else:
-            try:
-                figname = "_".join([str(val) for val in options.values()])+".eps"
-            except: 
-                figname = "" + ".eps"
-        plt.savefig(figname, format='eps')
-        #plt.show()
-        plt.close()
+    pnts = [reg_pnts(pnt) for pnt in xs]
+    pnts = [pnt for pnt in pnts if pnt<=max(exp_dH+calc_dH)]# and pnt>min(exp_dH+calc_dH)]
+
+    plt.plot(xs[:len(pnts)], pnts, ls="--", color="grey", label=f'slope: {slope:.2f}, intercept:+ {intercept:.2f}')
+
+    plt.plot([], [], label=f'$R^{2}$: {R2:.2f}')
+    plt.plot([], [], label=f'stderr: {se:.2f}')
+    plt.xlim(0,max(exp_dH+calc_dH) )
+    plt.ylim(0,max(exp_dH+calc_dH) )
+    if title:
+        plt.title(title)
+    else:
+        plt.title(f"{options['method']} {options['solvation']}")
+    plt.legend()
+
+    if figname:
+        ## Use the specified figname.
+        pass
+    else:
+        try:
+            figname = "_".join([str(val) for val in options.values()])+".eps"
+        except: 
+            figname = "" + ".eps"
+    plt.savefig(figname, format='eps')
+    #plt.show()
+    plt.close()
 
 if __name__ == "__main__": 
     import numpy as np 
@@ -315,7 +323,7 @@ if __name__ == "__main__":
     ##Get paths to amines and database.
     database_path = ""
     amines_csv_path  = ""
-
+    
     current_path = os.getcwd()
     if current_path == "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA":
         #amines_csv_path = "/Users/dbo/Documents/CarbonCapture/GA_playground/CarbonCaptureCatalystGA/examples/data/amines_with_ions.csv"
@@ -329,28 +337,26 @@ if __name__ == "__main__":
         print("Path is different than testing or running environemnt")
         print("The path is: ", current_path)
 
-    
+
     amines = pd.read_csv(amines_csv_path)
-    #exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
 
     calc_dH, exp_dH = [], []
 
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_1", "opt":True,  "solvation":"gbsa", "solvent":"water"},
-                       {"program":"xtb","method":"gfn_2", "solvation":"gbsa", "solvent":"water"}]#,
-
-
-    # list_of_options = [{"program":"orca","method":"r2SCAN-3c", "opt":True, "solvation":"CPCM", "solvent":"water"},
-    #                    {"program":"orca","method":"cam-b3lyp def2-tzvp", "solvation":"CPCM", "solvent":"water"}]
-    #                    #]#,
-                      # {"program":"orca","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
-                      #
-
+    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True,  "solvation":"alpb", "solvent":"water"}]#,
+        #{"program":"orca","method":"B3LYP SV(P) TIGHTOPT", "solvation":"CPCM", "solvent":"water"}]#,
+    
+     
+    #list_of_options = [ {"program":"orca","method":"r2SCAN-3c tightopt", "solvation":"CPCM", "solvent":"water"},
+    #                    {"program":"orca","method":"CAM-B3LYP Def2-TZVPP",  "solvation":"CPCM", "solvent":"water"}]
+                    #]#,
+                  # {"program":"orca","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
+                  #
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=1,
+        population_size=32,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -359,59 +365,58 @@ if __name__ == "__main__":
         db_mols_path = database_path
     )
 
-    # m = AmineCatalyst(Chem.MolFromSmiles("[NH3+]CCO"))#112.34863236070932
-    # m.options = comp_options
-    # m.program = comp_program
-    # m.calculate_energy(n_cores=1)
-    
-    # print("Computed score: ", Chem.MolToSmiles(m.mol), m.score)
-    #print(res)
     results = []
     results = ga.run()
 
-    # results_xtb = ga.run()
-
-    # 
-    #
-    # list_of_options = [{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
-    #                   # 
-
-    # ga = GraphGA(
-    #     mol_options=MoleculeOptions(AmineCatalyst),
-    #     population_size=32,
-    #     n_generations=1,
-    #     mutation_rate=0.0,
-    #     db_location="organic.sqlite",
-    #     scoring_kwargs={},
-    #     comp_options=list_of_options,
-    #     db_mols_path = database_path
-    # )
-    # results_orca = ga.run()
-
-
+    
     ##########################################################
-    ###Temporary code for benchmarking dH computations.#######
+    ###Temporary code for benchmarking k2 computations.#######
     ##########################################################
 
-    calc_names, calc_dH = [],[]
+    calc_names, calc_k =  [],[]
+    calc_names_tert, calc_k_tert = [], []
+    #print(f"results Kabs, {results}, {results[0]}, {results[0].kabs}")
+    #print("results[0].dG_lst", results[0].dG_lst)
+    for res in results:
+        print(Chem.MolToSmiles(res.mol), res.dHabs ,res.results)
+
     for molecule in results:
+        print(f"Score example: {molecule.score}")
         print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-        calc_names.append(Chem.MolToSmiles(molecule.mol))
-        calc_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+        if molecule.dG_lst[-1] in ["prim", "seco"]:
+            calc_names.append(Chem.MolToSmiles(molecule.mol))
+            calc_k.append(molecule.kabs)#$AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1])
+        elif molecule.dG_lst[-1] == "tert":
+            calc_names_tert.append(Chem.MolToSmiles(molecule.mol))
+            calc_k_tert.append(molecule.kabs)
+
+    ####  #MAKE PLOTS for prim/seco AND tert CASES
+
     ##########################################################
-
-
+    
+    
     ##########################################################
     ################Plotting preparation.####################
     ##########################################################
-    exp_dH = amines.loc[amines['SMILES'].isin(calc_names)]['dH'].tolist()
-    exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
 
-    exp_df = pd.DataFrame({"SMILES":exp_names, "dH_exp":exp_dH})
-    calc_df = pd.DataFrame({"SMILES":calc_names, "dH_calc":calc_dH})
+ 
+    #exp_k = amines.loc[amines['SMILES'].isin(calc_names)]['k2'].tolist()
+    #exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
 
-    dH_df = pd.merge(calc_df, exp_df, on="SMILES")
+    exp_df = amines[['SMILES','k2' ]]
+    calc_df = pd.DataFrame({"SMILES":calc_names, "k_calc":calc_k})
 
+    k2_df = pd.merge(calc_df, exp_df, on="SMILES")
+    k2_df.to_csv("k2_prim_seco.csv")
+
+
+    calc_df_tert = pd.DataFrame({"SMILES":calc_names_tert, "k_calc":calc_k_tert})
+    print(calc_df_tert)
+    k2_df_tert = pd.merge(calc_df_tert, exp_df, on="SMILES")
+    k2_df_tert.to_csv("k2_tert.csv")
+
+    print("outputs: ", k2_df, "k2")
+    print("outputs tert: ", k2_df_tert, "k2-tert")
     # xtb_names, xtb_dH = [],[]
     # for molecule in results_xtb:
     #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
@@ -439,13 +444,10 @@ if __name__ == "__main__":
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
     # GraphGA.plot_dH_vs_dH(dH_df_orca_xtb["dH_xtb"], dH_df_orca_xtb["dH_orca"], ga.comp_options[-1], figname="xtb_vs_orca.eps", title="gfn_2(alpb) vs r2SCAN-3c(CPCM)", xlab="xtb", ylab="orca")
+    #k2_df.to_csv("k_exp_vs_k_calc.csv")
 
-
-    GraphGA.plot_dH_vs_dH(dH_df["dH_exp"], dH_df["dH_calc"], ga.comp_options[-1])
+    #GraphGA.plot_dH_vs_dH(k2_df["k_exp"], k2_df["k_calc"], ga.comp_options[-1], title="K2 benchmark", figname="k2vsk2gbsa.png", xlab="k2 exp", ylab="k2 calc")
 
     # fig, ax = plt.subplots()
     # ax.plot(generations, best_scores)
     # ax.set_xlabel("Generation")
-    # ax.set_ylabel("Max Score")
-
-    #plt.savefig("organic.png")

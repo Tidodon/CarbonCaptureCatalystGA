@@ -60,7 +60,17 @@ def orca_calculate(
                 n_cores=n_cores,
             )
         )
-
+    with open("/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/header_test/"+"input.inp", "w") as f:
+        f.write(write_orca_input(
+                atoms,
+                coords,
+                charge,
+                multiplicity,
+                options,
+                xtra_inp_str=xtra_inp_str,
+                memory=memory,
+                n_cores=n_cores,
+            ))
     # cmd = f'{set_env}; {orca_cmd} input.inp "--bind-to-core" | tee orca.out' # "--oversubscribe" "--use-hwthread-cpus"
     cmd = f'{set_env} /bin/bash -c "{orca_cmd} input.inp "--use-hwthread-cpus" | tee orca.out"'
     _logger.debug(f"Running Orca as: {cmd}")
@@ -77,7 +87,7 @@ def orca_calculate(
         properties = ["electronic_energy", "mulliken_charges", "loewdin_charges"]
         if "hirshfeld" in [k.lower() for k in options.keys()]:
             properties.append("hirshfeld_charges")
-        if "opt" in [k.lower() for k in options.keys()]:
+        if "opt" or "tightopt" in options["method"]:#[k.lower() for k in options.keys()]:
             properties.append("opt_structure")
         results = get_orca_results(lines, properties=properties)
     else:
@@ -137,6 +147,8 @@ def write_orca_input(
     inputstr += "*\n"
     inputstr += "\n"  # magic line
     print("ORCA INPUT STR: ", inputstr)
+    with open("ZZZZ__orca_input.txt", "w") as f:
+        f.write(inputstr)
     return inputstr
 
 
