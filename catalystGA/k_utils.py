@@ -141,6 +141,7 @@ def list_of_dGs(mol, barrier=1, ):
     outputs: a list. each element is a list/dict of : id of affected N, dG, geometry?
     """
     outs = []
+    mol =Chem.MolFromSmiles(Chem.MolToSmiles(mol))
     mol = Chem.AddHs(mol)
     ###### Problem here? Outs gets reset each mol? Or pattern match issue?
     for i, patt in enumerate(patts):
@@ -148,11 +149,7 @@ def list_of_dGs(mol, barrier=1, ):
         for atom_id in atoms_match:
             
             dG, geom_r, geom_ts = compute_dG(mol, atom_id, which_step=barrier, amine_type=amine_types[i])
-            mol = Chem.RemoveHs(mol)
-            outs.append([mol, barrier, atom_id, dG, geom_r, geom_ts, amine_type])
-        # products = Chem.rdmolops.ReplaceSubstructs(mol=mol, query=patt, replacement=repl)
-        # products = [Chem.MolFromSmiles(m) for m in set([Chem.MolToSmiles(p) for p in products])]
-
+            outs.append([Chem.RemoveHs(mol), barrier, atom_id, dG, geom_r, geom_ts, amine_types[i]])
     return outs
 
 def compute_dG(cat, atom_id, which_step=1, amine_type="tert"):
@@ -183,7 +180,7 @@ def compute_dG(cat, atom_id, which_step=1, amine_type="tert"):
     ts_dummy = Chem.SDMolSupplier(ts_file, removeHs=False, sanitize=True)[0]
     cat_dummy = Chem.SDMolSupplier(cat_file, removeHs=False, sanitize=True)[0]
 
-    De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, cat_dummy, atom_id=atom_id, idx=(2, 2), ncpus=4, n_confs=4, cleanup=True, prot_N_patt = prot_N_patt, amine_type=amine_type)#, orca_options={"r2SCAN-3c":"", "CPCM":"water"})
+    De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, cat_dummy, atom_id=atom_id, idx=(2, 2), ncpus=6, n_confs=4, cleanup=True, prot_N_patt = prot_N_patt, amine_type=amine_type)#, orca_options={"r2SCAN-3c":"", "CPCM":"water"})
 
     return De, cat3d_geom, ts3d_geom
 
@@ -227,8 +224,9 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
         print("MATCH:", match)
 
     co2 = list(ts2d.GetSubstructMatch(Chem.MolFromSmarts("O=C=O")))
-    n_group = atom_id#ts2d.GetSubstructMatch( cat)[atom_id]
-
+    n_group = ts2d.GetSubstructMatch( cat)[atom_id]
+    #print(f"Prebonding: {cat.GetSubstructMatches(patts[2])}, postbonding:  {ts2d.GetSubstructMatches(patts[2])}")
+    #print(f"New id assignment test. Old atom_id: {atom_id}, New atom_id: {ts2d.GetSubstructMatch(cat)[atom_id]}")
     atoms2join = ()
     if amine_type in ["prim", "seco"]:
         atoms2join = ((n_group, co2[0]),)
@@ -240,6 +238,7 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
         print("Incorrect amine_type in ts_scoring")
         pass
 
+    print(f"IBNSIDE K COMPUTE. atoms2join:{atoms2join}, mol n atom id: {ts2d.GetSubstructMatches(patts[2])} ")
     # Embed TS
     ts3d = ConstrainedEmbedMultipleConfsMultipleFrags(
         mol=ts2d,
@@ -280,7 +279,6 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
         numThreads=ncpus,
         cleanup=cleanup,
     )
-    print("!!!!!! ts3d_geom ;: ",ts3d_geom)   
     if orca_options:
         print(f"orca options: {orca_options}")
         res = orca_calculate(atoms=ts3d_geom['atoms'], coords=ts3d_geom['coords'], options=orca_options, n_cores=ncpus )

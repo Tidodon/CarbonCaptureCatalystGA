@@ -149,7 +149,7 @@ class AmineCatalyst:
         #Assign score values based on dH, k, SA
 
         #dH scorings alone.
-        self.score = self.kabs #self.dHabs[1]
+        self.score = self.dHabs[1]
         
         #### Later a reordering code will be added here.
 
@@ -229,9 +229,9 @@ class GraphGA(GA):
         ####
         print("Population in run: ", self.population)
 
-        for pop in self.population:
-            pop.calculate_score()
-        #self.population = self.calculate_scores(self.population, gen_id=0)
+        #for pop in self.population:
+        #    pop.calculate_score()
+        self.population = self.calculate_scores(self.population, gen_id=0)
         print(f"Size of pop: {len(self.population)}")
         for pop in self.population:
             print("in calculate score:", Chem.MolToSmiles(pop.mol))
@@ -353,7 +353,7 @@ if __name__ == "__main__":
                   #
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=1,
+        population_size=3,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -373,9 +373,9 @@ if __name__ == "__main__":
     calc_names, calc_k =  [],[]
     calc_names_tert, calc_k_tert = [], []
     #print(f"results Kabs, {results}, {results[0]}, {results[0].kabs}")
-    print("results[0].dG_lst", results)
+    print("COMPUTED MOLS:", len(results))
     for res in results:
-        print("DHABS: ",Chem.MolToSmiles(res.mol), res.dHabs ,res.results)
+        print("actual kabs: ",Chem.MolToSmiles(res.mol), res.kabs)
 
     for molecule in results:
         print(f"Score example: {molecule.score}")
