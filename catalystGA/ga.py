@@ -13,7 +13,11 @@ import submitit
 import tomli
 
 from catalystGA.utils import GADatabase, MoleculeOptions, str_table
-
+from rdkit.Chem import RDConfig
+import sys
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
+#
 
 class GA(ABC):
     DB_LOCATION = f"ga_{time.strftime('%Y-%m-%d_%H-%M')}.sqlite"
@@ -126,15 +130,17 @@ class GA(ABC):
                 error = f"Exception: {e}\n"
                 error += "{job.stderr()}"
                 cat = population[i]
+                print(f"Exception raised in calcualte scores: {error}")
             finally:
                 cat.error = error
+                print(f"Finally raised in calcualte scores: {error}")
             new_population.append(cat)
         population = new_population
 
-        for pop in population:
-            print("BIGpopop")
-            print("dG_lst inside ga.py", pop.dG_lst)
-            print("kabs inside ga.py: ", pop.kabs)
+        #for pop in population:
+        #    print("BIGpopop")
+        #    print("dG_lst inside ga.py", pop.dG_lst)
+        #    print("kabs inside ga.py: ", pop.kabs)
 
         self.sort_population(population, self.maximize_score) 
 

@@ -87,6 +87,15 @@ amine_types = {0 : "prim", 1 : "seco", 2 : "tert"}
 boltzmann_const_kcal = 1.987204259*10**(-3) #kcal/(mol*K)
 boltzmann_const_ev = 8.617333262 * 10 **(-5) # eV/K
 planck = 4.135667696 * 10 **(-15)
+gas_constant_kcal = 1.9872036 * 10**-3
+
+def write_orca_constr_string(atom_ids):
+    out = '\n%geom Constraints\n'
+    for atom_id in atom_ids:
+        out += '    { C ' + str(atom_id) + ' C }\n'
+    out+= '    end\n'
+    out+= 'end'
+    return out
 
 def write_constr_file(atom_ids, method, filename, **kwargs):
     """
@@ -113,10 +122,11 @@ def write_constr_file(atom_ids, method, filename, **kwargs):
     constr_str = constr_str[:-2] +"\n\n"
 
     #### Method part
-    constr_str += f"${method} \n"
-    for key, value in kwargs.items():
-        constr_str += f"    {key}: {value}\n"
-    constr_str += "$end"
+    if "gbsagrid" in kwargs:
+        constr_str += f"${method} \n"
+        for key, value in kwargs.items():
+            constr_str += f"    {key}: {value}\n"
+        constr_str += "$end"
 
     with open(filename, "w") as f:
         f.write(constr_str)
@@ -131,7 +141,9 @@ def compute_k_rate_from_dG(dG, T):
     Due to possiible very high values of k depending on dG and therefore potential overflow
     I compute the natural logarithm of k instead of the actual value.
     """ 
-    return np.log(planck/(boltzmann_const_ev * T)) - (dG/(boltzmann_const_kcal*T))
+    #a, b = np.log(planck/(boltzmann_const_ev * T)),  - (dG/(boltzmann_const_kcal*T))
+    #print(f"k_rate compute check parts : {a}, {b}")
+    return np.log((boltzmann_const_ev * T)/planck) - (dG/(boltzmann_const_kcal*T))
 
 
 def list_of_dGs(mol, barrier=1, ):
@@ -180,7 +192,7 @@ def compute_dG(cat, atom_id, which_step=1, amine_type="tert"):
     ts_dummy = Chem.SDMolSupplier(ts_file, removeHs=False, sanitize=True)[0]
     cat_dummy = Chem.SDMolSupplier(cat_file, removeHs=False, sanitize=True)[0]
 
-    De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, cat_dummy, atom_id=atom_id, idx=(2, 2), ncpus=6, n_confs=4, cleanup=True, prot_N_patt = prot_N_patt, amine_type=amine_type)#, orca_options={"r2SCAN-3c":"", "CPCM":"water"})
+    De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, cat_dummy, atom_id=atom_id, idx=(2, 2), ncpus=6, n_confs=4, cleanup=True, prot_N_patt = prot_N_patt, amine_type=amine_type)#, orca_options={"r2SCAN-3c":"",  "CPCM":"water", "detailed_options":'%cpcm smd true \n   SMDsolvent "water" \n end'})#"OPT":"",
 
     return De, cat3d_geom, ts3d_geom
 
@@ -202,7 +214,10 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
     The ordering of the indices corresponds to the atom ordering
     in the query. For example, the first index is for the atom in this molecule that matches the first atom in the query.
     """
-
+    if list(orca_options.keys()).count("detailed_options") == 1: 
+        detailed_options = orca_options.pop("detailed_options")
+    else:
+        detailed_options = ""
     ###Just to get the smile of the complex:
     if amine_type in  ["prim", "seco"]:
         core_mol = Chem.MolFromSmiles("O=C=O.[1*]")
@@ -211,22 +226,16 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
     else:
         print("Unspecified amine type")
 
+
     ts2d = connect_cat_2d(core_mol, cat, atom_id, prot_N_patt = prot_N_patt)
 
     ### CANONICALIZE
     ts2d = Chem.MolFromSmiles(Chem.MolToSmiles(Chem.MolFromSmiles(Chem.MolToSmiles(ts2d))))
     ts2d = Chem.AddHs(ts2d)
 
-    for atom in cat.GetAtoms():
-        print("cat", atom.GetSymbol(), atom.GetIdx())
-
-    for match in ts2d.GetSubstructMatches( cat) :
-        print("MATCH:", match)
-
     co2 = list(ts2d.GetSubstructMatch(Chem.MolFromSmarts("O=C=O")))
     n_group = ts2d.GetSubstructMatch( cat)[atom_id]
-    #print(f"Prebonding: {cat.GetSubstructMatches(patts[2])}, postbonding:  {ts2d.GetSubstructMatches(patts[2])}")
-    #print(f"New id assignment test. Old atom_id: {atom_id}, New atom_id: {ts2d.GetSubstructMatch(cat)[atom_id]}")
+
     atoms2join = ()
     if amine_type in ["prim", "seco"]:
         atoms2join = ((n_group, co2[0]),)
@@ -238,7 +247,6 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
         print("Incorrect amine_type in ts_scoring")
         pass
 
-    print(f"IBNSIDE K COMPUTE. atoms2join:{atoms2join}, mol n atom id: {ts2d.GetSubstructMatches(patts[2])} ")
     # Embed TS
     ts3d = ConstrainedEmbedMultipleConfsMultipleFrags(
         mol=ts2d,
@@ -251,37 +259,42 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
     
     atom_ids = list(ts3d.GetSubstructMatch(ts_dummy))
 
-    #for atom in ts_dummy.GetAtoms():
-    #    print(atom.GetSymbol(), atom.GetIdx())
     h2o_ids = ts3d.GetSubstructMatch(Chem.MolFromSmarts("[H]-O-[H]"))
     
-
     ### PRUNE NON H2O HYDROGENS. might be superfluous.
     for atom_id in atom_ids:
         
         #if atom_id not in h2o_ids:
         #    print(f'Not in h2o_ids: {atom_id}')
-        if ts3d.GetAtomWithIdx(atom_id).GetSymbol() == "H" and atom_id not in h2o_ids:
+        if (ts3d.GetAtomWithIdx(atom_id).GetSymbol() == "H") and (atom_id not in h2o_ids):
+            atom_ids.remove(atom_id)
+        if (ts3d.GetAtomWithIdx(atom_id).GetSymbol() == "C") and (atom_id not in co2):
             atom_ids.remove(atom_id)
 
     filename = catalyst_dir +"/input_files/constr.inp"
-    write_constr_file(atom_ids, "gbsa", filename, gbsagrid="normal")
+    write_constr_file(atom_ids, "gbsa", filename)#, gbsagrid="normal")
 
     #Calc Energy of TS
     ts3d_energy, ts3d_geom = xtb_optimize(
         ts3d,
-        gbsa="water",
-        #alpb="water",
+        #gbsa="water",
+        alpb="water",
         #gbsa="methanol",
-        opt_level="tight",
+        opt_level="crude",
         #name=f"{idx[0]:03d}_{idx[1]:03d}_ts",
         input=os.path.join(catalyst_dir, filename),#
         numThreads=ncpus,
         cleanup=cleanup,
     )
+    detailed_options_rea = copy.deepcopy(detailed_options)
+    if "OPT" in orca_options.keys():
+        # add 
+        detailed_options += write_orca_constr_string(atom_ids) 
+
+
     if orca_options:
         print(f"orca options: {orca_options}")
-        res = orca_calculate(atoms=ts3d_geom['atoms'], coords=ts3d_geom['coords'], options=orca_options, n_cores=ncpus )
+        res = orca_calculate(atoms=ts3d_geom['atoms'], coords=ts3d_geom['coords'], options=orca_options, xtra_inp_str=detailed_options ,  n_cores=ncpus )
         print(f"first res: {res}")
         ts3d_energy = res['electronic_energy']  
 
@@ -317,16 +330,17 @@ def ts_scoring(cat, ts_dummy, cat_dummy, atom_id=0, idx=(0, 0), ncpus=1, n_confs
     #Calc Energy of Cat
     cat3d_energy, cat3d_geom = xtb_optimize(
         cat3d,
-        #alpb="water",
-        gbsa="water",
-        opt_level="tight",
+        alpb="water",
+        #gbsa="water",
+        opt_level="crude",
         #name=f"{idx[0]:03d}_{idx[1]:03d}_cat",
         numThreads=ncpus,
         cleanup=cleanup,
     )
 
     if orca_options:
-        res = orca_calculate(atoms=cat3d_geom['atoms'], coords=cat3d_geom['coords'], options=orca_options, n_cores=ncpus )
+        res = orca_calculate(atoms=cat3d_geom['atoms'], coords=cat3d_geom['coords'], options=orca_options, xtra_inp_str=detailed_options_rea, n_cores=ncpus )
+        print(f"second res: {res}")
         cat3d_energy = res['electronic_energy'] 
         print("SECOND orca options!!!!!")
 

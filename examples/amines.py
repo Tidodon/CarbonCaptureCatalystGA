@@ -1,15 +1,20 @@
+#TODO:
+#-treat tert
 import math
 
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 from rdkit.Chem import Draw
 from rdkit.Chem import AllChem
+from rdkit.Chem import RDConfig
 from rdkit.Chem.Draw import IPythonConsole
 from rdkit.ML.Cluster import Butina
 import copy
 import sys
 import os
 
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
 
 #import ts_utils
 
@@ -114,7 +119,17 @@ class AmineCatalyst:
             return True
         except Exception as ex:
             return False
-        
+
+    @staticmethod
+    def rect_conv(x, sig=1,n =1):
+        a = x-sig
+        b = x+sig
+        return 0.5*(math.erf(n*b)-math.erf(n*a))
+
+    @staticmethod 
+    def sigmoid(x):
+        return 1 / (1 + math.exp(-x))
+
     def calculate_score(
         self, n_cores: int = 4, envvar_scratch: str = "SCRATCH", scoring_kwargs: dict = {}
     ):
@@ -130,11 +145,31 @@ class AmineCatalyst:
         reactant_energy, product_energies, miscs = self.results[-1]
 
         dHs = compute_dH_list(smile=self.smiles, reactant_energy=reactant_energy, product_energies=product_energies, miscs_energies=miscs)
+       
+        ###Computed transitions state dG
+        self.dG_lst = list_of_dGs(Chem.RemoveHs(self.mol))
 
+        #### Assign atom_ids to protonated amines.
+        for i,sm in enumerate(dHs):
+            prot_amine = Chem.MolFromSmarts("[#7;+]")
+            amine_id = Chem.MolFromSmiles(sm[0]).GetSubstructMatch(prot_amine)
+            dHs[i] = [*dHs[i], amine_id[0]]
+
+        #### Match dH/k amines
+        dG_ts = min(self.dG_lst, key=lambda x: x[3])
+        ts_id = dG_ts[2]
+        matched_dH = [] 
+        for lst in dHs:
+            if lst[-1]==ts_id:
+                matched_dH = lst
+                break
+
+        self.kabs = compute_k_rate_from_dG(dG_ts[3], self.T_K) 
+         
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
          
-        
+        print(f"self.dHabs: {self.dHabs}") 
         #AmineCatalyst.hartree_to_kjmol(
         #results_list = [[reactant_energy], [ ]for prod in prods]
 
@@ -142,14 +177,27 @@ class AmineCatalyst:
 
         ### Decide on which product to use by k value:
         
-        dGs = list_of_dGs(Chem.RemoveHs(self.mol)) 
-        print(f"dGs: {dGs}")
-        self.dG_lst = min(dGs, key=lambda x: x[3])
-        self.kabs = compute_k_rate_from_dG(self.dG_lst[3], self.T_K) 
+
+        print(f"dHs: {dHs}")
+        #print(f"dGs: {self.dG_lst}")
+        #print(f"dG mol smile: {Chem.MolToSmiles(self.dG_lst[0][0])}") 
         #Assign score values based on dH, k, SA
+        slope_k,  intercept_k  = 0.08896083453589532, 0.7866132724304302 #Data from alpb->r2scan opt runs
+        slope_dH, intercept_dH = 0.4348138758572645,  53.47577527659122
+        adjusted_kabs = self.kabs * slope_k +  intercept_k
+        adjusted_dH   = self.dHabs[1] * slope_dH + intercept_dH
+        k_cutoff = np.log(15000)
+        dH_mid = (40+75)/2
+        k_score  = AmineCatalyst.sigmoid(adjusted_kabs - k_cutoff)
+
+        dH_score = AmineCatalyst.rect_conv(adjusted_dH - dH_mid, sig=17.5, n=0.3)
+
+        ring_penalty  = len(max(self.mol.GetRingInfo().BondRings(), key=len))/6
+        sa_score = sascorer.calculateScore(self.mol)
 
         #dH scorings alone.
-        self.score = self.dHabs[1]
+        print(f"Score components: \nk_score     :{k_score}\ndH_score    :{dH_score}\nring_penalty:{ring_penalty}\n sa_score    :{sa_score}")
+        self.score = k_score*dH_score - ring_penalty - sa_score 
         
         #### Later a reordering code will be added here.
 
@@ -334,15 +382,21 @@ if __name__ == "__main__":
         print("Path is different than testing or running environemnt")
         print("The path is: ", current_path)
 
+    def canonicalize(smile: str) -> str:
+        return Chem.MolToSmiles(Chem.MolFromSmiles(smile))
 
+    #amines_csv_path = amines_csv_path[:-10] + "conw_prepped.csv"
     amines = pd.read_csv(amines_csv_path)
 
+    print(f"amines pre canonicalize: {amines}")
+    amines['smiles'] = amines['smiles'].apply(canonicalize)
+    print(f"amines post canonicalize: {amines}")
     calc_dH, exp_dH = [], []
 
     cnt = 0
     names, dHs = [],[]
 
-    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True,  "solvation":"gbsa", "solvent":"water"}]#,
+    list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True,  "solvation":"alpb", "solvent":"water"}]#,
     #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
     
      
@@ -353,7 +407,7 @@ if __name__ == "__main__":
                   #
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=3,
+        population_size=2,
         n_generations=1,
         mutation_rate=0.0,
         db_location="organic.sqlite",
@@ -373,19 +427,23 @@ if __name__ == "__main__":
     calc_names, calc_k =  [],[]
     calc_names_tert, calc_k_tert = [], []
     #print(f"results Kabs, {results}, {results[0]}, {results[0].kabs}")
-    print("COMPUTED MOLS:", len(results))
-    for res in results:
-        print("actual kabs: ",Chem.MolToSmiles(res.mol), res.kabs)
+    #print("COMPUTED MOLS:", len(results))
+    #for res in results:
+    #    print("actual kabs: ",Chem.MolToSmiles(res.mol), res.kabs)
 
-    for molecule in results:
-        print(f"Score example: {molecule.score}")
-        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-        if molecule.dG_lst[-1] in ["prim", "seco"]:
-            calc_names.append(Chem.MolToSmiles(molecule.mol))
-            calc_k.append(molecule.kabs)#$AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1])
-        elif molecule.dG_lst[-1] == "tert":
-            calc_names_tert.append(Chem.MolToSmiles(molecule.mol))
-            calc_k_tert.append(molecule.kabs)
+    #for molecule in results:
+    #    print(f"Score example: {molecule.score}")
+    #    if molecule.score == math.nan:
+    #        continue
+    #    print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+    #    #if molecule.dG_lst == False:
+    #    #    continue
+    #    #if True:#molecule.dG_lst[-1] in ["prim", "seco"]:
+    #    calc_names.append(Chem.MolToSmiles(molecule.mol))
+    #    calc_k.append(molecule.kabs)#$AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1])
+    #    #elif molecule.dG_lst[-1] == "tert":
+    #    #    calc_names_tert.append(Chem.MolToSmiles(molecule.mol))
+    #    #    calc_k_tert.append(molecule.kabs)
 
     ####  #MAKE PLOTS for prim/seco AND tert CASES
 
@@ -397,32 +455,42 @@ if __name__ == "__main__":
     ##########################################################
 
  
-    exp_k = amines.loc[amines['SMILES'].isin(calc_names)]['k2'].tolist()
-    exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
+    #exp_k = amines.loc[amines['SMILES'].isin(calc_names)]['k2'].tolist()
+    #exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
+    
+    #exp_k = amines.loc[amines['smiles'].isin(calc_names)]['logK7'].tolist()
+    #exp_names = amines.loc[amines['smiles'].isin(calc_names)]['smiles'].tolist()
 
-    exp_df = amines[['SMILES','k2' ]]
-    calc_df = pd.DataFrame({"SMILES":calc_names, "k_calc":calc_k})
+    #exp_k_2 = amines.loc[amines['smiles'].isin(calc_names)]['logk7'].tolist()
+    #exp_names = amines.loc[amines['smiles'].isin(calc_names)]['smiles'].tolist()
 
-    k2_df = pd.merge(calc_df, exp_df, on="SMILES")
-    k2_df.to_csv("xxk2_prim_seco_r2scan_sp.csv")
+    #exp_df = amines[['SMILES','k2' ]]
+    #calc_df = pd.DataFrame({"SMILES":calc_names, "k_calc":calc_k})
+    #exp_df = amines[['smiles','logK7' ]]
+    #exp_df2 = amines[['smiles','logk7' ]]
+    #calc_df = pd.DataFrame({"smiles":calc_names, "k_calc":calc_k})
+    #print(f"calc_names: {calc_df}")
+    #k_df = pd.merge(calc_df, exp_df, on="smiles")
+    #k2_df = pd.merge(k_df, exp_df2, on="smiles")
+    #print(f"merged: {k2_df}")
+    #k2_df.to_csv("xxxxk_prim_seco_gbsa_r2scan_opt.csv")
 
 
-    calc_df_tert = pd.DataFrame({"SMILES":calc_names_tert, "k_calc":calc_k_tert})
-    print(calc_df_tert)
-    k2_df_tert = pd.merge(calc_df_tert, exp_df, on="SMILES")
-    k2_df_tert.to_csv("xxk2_tert_r2scan_sp.csv")
+    #calc_df_tert = pd.DataFrame({"smiles":calc_names_tert, "k_calc":calc_k_tert})
+    #print(calc_df_tert)
+    #k2_df_tert = pd.merge(calc_df_tert, exp_df, on="smiles")
+    #k2_df_tert.to_csv("logK7_tert_gbsa.csv")
 
-    print("outputs: ", k2_df, "k2")
-    print("outputs tert: ", k2_df_tert, "k2-tert")
+    #print("outputs: ", k2_df, "logK7")
+    #print("outputs tert: ", k2_df_tert, "logK7-tert")
 
-    # xtb_names, xtb_dH = [],[]
-    # for molecule in results_xtb:
-    #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-    #     xtb_names.append(Chem.MolToSmiles(molecule.mol))
-    #     xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
-
-    # xtb_df = pd.DataFrame({"SMILES":xtb_names, "dH_xtb":xtb_dH})
-
+    xtb_names, xtb_dH = [],[]
+    for molecule in results:
+        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+        xtb_names.append(Chem.MolToSmiles(molecule.mol))
+        xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+        
+    xtb_df = pd.DataFrame({"smiles":xtb_names, "dH_xtb":xtb_dH})
     # orca_names, orca_dH = [],[]
     # for molecule in results_orca:
     #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
@@ -431,10 +499,11 @@ if __name__ == "__main__":
 
     # orca_df = pd.DataFrame({"SMILES":orca_names, "dH_orca":orca_dH})
 
-    # dH_df_orca_xtb = pd.merge(xtb_df, orca_df, on="SMILES")
+    dH_df= pd.merge(xtb_df, amines, on="smiles")
 
-    # print(dH_df) 
-
+    print(dH_df)
+    #dH_df.to_csv("xtb2_alpb_opt_dH.csv")
+    
     #exp_dH = [ v[2] for v in ] 
 
     #generations = [r[0] for r in results]
