@@ -192,7 +192,7 @@ def compute_dG(cat, atom_id, which_step=1, amine_type="tert"):
     ts_dummy = Chem.SDMolSupplier(ts_file, removeHs=False, sanitize=True)[0]
     cat_dummy = Chem.SDMolSupplier(cat_file, removeHs=False, sanitize=True)[0]
 
-    De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, cat_dummy, atom_id=atom_id, idx=(2, 2), ncpus=6, n_confs=4, cleanup=True, prot_N_patt = prot_N_patt, amine_type=amine_type)#, orca_options={"r2SCAN-3c":"",  "CPCM":"water", "detailed_options":'%cpcm smd true \n   SMDsolvent "water" \n end'})#"OPT":"",
+    De, ts3d_geom, cat3d_geom = ts_scoring(cat, ts_dummy, cat_dummy, atom_id=atom_id, idx=(2, 2), ncpus=4, n_confs=4, cleanup=True, prot_N_patt = prot_N_patt, amine_type=amine_type, orca_options={"r2SCAN-3c":"",  "CPCM":"water", "OPT":"", "detailed_options":'%cpcm smd true \n   SMDsolvent "water" \n end'})#"OPT":"",
 
     return De, cat3d_geom, ts3d_geom
 

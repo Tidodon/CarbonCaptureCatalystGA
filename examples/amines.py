@@ -1,6 +1,7 @@
 #TODO:
 #-treat tert
 import math
+import random
 
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -183,7 +184,7 @@ class AmineCatalyst:
         #print(f"dG mol smile: {Chem.MolToSmiles(self.dG_lst[0][0])}") 
         #Assign score values based on dH, k, SA
         slope_k,  intercept_k  = 0.08896083453589532, 0.7866132724304302 #Data from alpb->r2scan opt runs
-        slope_dH, intercept_dH = 0.4348138758572645,  53.47577527659122
+        slope_dH, intercept_dH = 0.4348138758572645,  53.47577527659122  #Data from 32 amines with alpb/gfn2 opt runs
         adjusted_kabs = self.kabs * slope_k +  intercept_k
         adjusted_dH   = self.dHabs[1] * slope_dH + intercept_dH
         k_cutoff = np.log(15000)
@@ -192,15 +193,18 @@ class AmineCatalyst:
 
         dH_score = AmineCatalyst.rect_conv(adjusted_dH - dH_mid, sig=17.5, n=0.3)
 
-        ring_penalty  = len(max(self.mol.GetRingInfo().BondRings(), key=len))/6
+        ri = self.mol.GetRingInfo().BondRings()
+        ring_penalty = 0
+        if len(ri)>0:
+            ring_penalty  = len(max(ri, key=len))/6
         sa_score = sascorer.calculateScore(self.mol)
 
         #dH scorings alone.
         print(f"Score components: \nk_score     :{k_score}\ndH_score    :{dH_score}\nring_penalty:{ring_penalty}\n sa_score    :{sa_score}")
         self.score = k_score*dH_score - ring_penalty - sa_score 
-        
         #### Later a reordering code will be added here.
-
+        self.dHabs[1] = adjusted_dH 
+        self.kabs = adjusted_kabs
         #order_amine_products(dH, dG) -> top three most reactive. 
         ####
         #logP = Descriptors.MolLogP(self.mol)
@@ -208,24 +212,24 @@ class AmineCatalyst:
 
 class GraphGA(GA):
     def __init__(
-        self,
-        mol_options,
-        population_size,
-        n_generations,
-        mutation_rate,
-        scoring_kwargs,
-        db_location,
-        comp_options,
-        db_mols_path, 
-    ):
+            self,
+            mol_options,
+            population_size,
+            n_generations,
+            mutation_rate,
+            scoring_kwargs,
+            db_location,
+            comp_options,
+            db_mols_path, 
+            ):
         super().__init__(
-            mol_options     = mol_options,
-            population_size = population_size,
-            n_generations   = n_generations,
-            mutation_rate   = mutation_rate,
-            db_location     = db_location,
-            scoring_kwargs  = scoring_kwargs,
-        )
+                mol_options     = mol_options,
+                population_size = population_size,
+                n_generations   = n_generations,
+                mutation_rate   = mutation_rate,
+                db_location     = db_location,
+                scoring_kwargs  = scoring_kwargs,
+                )
         self.comp_options = comp_options
         self.db_mols_path = db_mols_path
 
@@ -234,6 +238,7 @@ class GraphGA(GA):
         with open(amine_pops_path, "r") as f: #data -> csv
             lines = f.readlines()[1:]
         mols = [Chem.MolFromSmiles(line.split(",")[0]) for line in lines]
+        random.shuffle(mols) 
         population = [AmineCatalyst(mol) for mol in mols[: self.population_size]]
         for amine in population:
             amine.list_of_options = self.comp_options
@@ -244,8 +249,10 @@ class GraphGA(GA):
         mol1 = ind1.mol
         mol2 = ind2.mol
         new_mol = None
-        while not new_mol:
+        cnt = 0
+        while (not new_mol) and cnt <20:
             new_mol = graph_crossover(mol1, mol2)
+            cnt +=1
         try:
             Chem.SanitizeMol(new_mol)
             ind = AmineCatalyst(new_mol)
@@ -264,49 +271,73 @@ class GraphGA(GA):
             return ind
         except Exception:
             return None
-        
+
+    def add_comp_db_attributes(self, pop):
+        for amine in pop:
+            amine.list_of_options = self.comp_options
+            amine.database_path = self.db_mols_path
+        return pop
+
     def run(self):
         results = []  # here the best individuals of each generation will be stored
         self.print_parameters()
-        
+
         self.population = self.make_initial_population()
-        
+
         # self.miscs = [get_miscs(options) for options in list_of_options]
 
         ### save to db.
         ####
         print("Population in run: ", self.population)
-
         #for pop in self.population:
         #    pop.calculate_score()
+
         self.population = self.calculate_scores(self.population, gen_id=0)
-        print(f"Size of pop: {len(self.population)}")
-        for pop in self.population:
-            print("in calculate score:", Chem.MolToSmiles(pop.mol))
-            #print(pop.kabs)
-            #insert_result_to_db(database_path=self.db_mols_path, results=pop.results, list_of_options=self.comp_options)
+        #self.calculate_fitness(self.population)
+
+        #children = self.reproduce(self.population, 0 + 1)
+        #    #insert_result_to_db(database_path=self.db_mols_path, results=pop.results, list_of_options=self.comp_options)
         
         #self.add_computed_pops_to_db()
 
-        results = self.population
-        # self.db.add_individuals(0, self.population)
+        self.db.add_individuals(0, self.population)
         
-        # self.print_population(self.population, 0)
+        self.print_population(self.population, 0)
         
-        # for n in range(0, self.n_generations):
-        #     print("N-generation: ", n, "\n")
-        #     self.calculate_fitness(self.population)
-        #     self.db.add_generation(n, self.population)
-        #     self.append_results(results, gennum=n, detailed=True)
-        #     children = self.reproduce(self.population, n + 1)
-        #     children = self.calculate_scores(children, gen_id=n + 1)
-        #     self.db.add_individuals(n + 1, children)
-        #     self.population = self.prune(self.population + children)
-        #     self.print_population(self.population, n + 1)
-        # self.calculate_fitness(self.population)
-        # self.db.add_generation(n + 1, self.population)
-        # self.append_results(results, gennum=n + 1, detailed=True)
-    
+        for n in range(0, self.n_generations):
+            print("N-generation: ", n, "\n")
+             
+            self.calculate_fitness(self.population)
+             
+            self.db.add_generation(n, self.population)
+             
+            self.append_results(results, gennum=n, detailed=True)
+             
+            print(f"population in gen: {n} is {self.population}")
+            #for pop in self.population:
+            #    if isinstance(pop, tuple):
+            #        del pop
+            #    else:
+            #        print(f"mol:{Chem.MolToSmiles(pop.mol)}, fitness:{pop.fitness}, score:{pop.score}")
+
+            children = self.reproduce(self.population, n + 1)
+            #with open("produced_children_mols", "a") as f:
+            #    for m in children:
+            #        f.write(Chem.MolToSmiles(m.mol))
+            #        f.write("\n")
+                           
+            children = self.add_comp_db_attributes(children) #####Appends comp methods and db
+            #for pop in children:
+            #    pop.calculate_score()
+
+            children = self.calculate_scores(children, gen_id=n + 1)
+            self.db.add_individuals(n + 1, children)
+            self.population = self.prune(self.population + children)
+            self.print_population(self.population, n + 1)
+        self.calculate_fitness(self.population)
+        self.db.add_generation(n + 1, self.population)
+        self.append_results(results, gennum=n + 1, detailed=True)
+        print("FINISHEDi GA") 
         return results
 
     @staticmethod
@@ -385,7 +416,7 @@ if __name__ == "__main__":
     def canonicalize(smile: str) -> str:
         return Chem.MolToSmiles(Chem.MolFromSmiles(smile))
 
-    #amines_csv_path = amines_csv_path[:-10] + "conw_prepped.csv"
+    amines_csv_path = amines_csv_path[:-10] + "conw_prepped.csv"
     amines = pd.read_csv(amines_csv_path)
 
     print(f"amines pre canonicalize: {amines}")
@@ -399,25 +430,23 @@ if __name__ == "__main__":
     list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True,  "solvation":"alpb", "solvent":"water"}]#,
     #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
     
-     
     #list_of_options = [ {"program":"orca","method":"r2SCAN-3c tightopt", "solvation":"CPCM", "solvent":"water"},
     #                    {"program":"orca","method":"CAM-B3LYP Def2-TZVPP",  "solvation":"CPCM", "solvent":"water"}]
                     #]#,
-                  # {"program":"orca","method":"gfn_2", "opt":True, "solvation":"alpb", "solvent":"water"}
                   #
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=2,
-        n_generations=1,
-        mutation_rate=0.0,
+        population_size=15,
+        n_generations=10,
+        mutation_rate=0.5,
         db_location="organic.sqlite",
         scoring_kwargs={},
         comp_options=list_of_options,
         db_mols_path = database_path
     )
 
-    results = []
-    results = ga.run()
+    res = []
+    res = ga.run()
 
     
     ##########################################################
@@ -484,13 +513,13 @@ if __name__ == "__main__":
     #print("outputs: ", k2_df, "logK7")
     #print("outputs tert: ", k2_df_tert, "logK7-tert")
 
-    xtb_names, xtb_dH = [],[]
-    for molecule in results:
-        print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-        xtb_names.append(Chem.MolToSmiles(molecule.mol))
-        xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
+    #xtb_names, xtb_dH = [],[]
+    #for molecule in results:
+    #    #print("molecuel: ", Chem.MolToSmiles(molecule.mol))
+    #    xtb_names.append(Chem.MolToSmiles(molecule.mol))
+    #    xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
         
-    xtb_df = pd.DataFrame({"smiles":xtb_names, "dH_xtb":xtb_dH})
+    #xtb_df = pd.DataFrame({"smiles":xtb_names, "dH_xtb":xtb_dH})
     # orca_names, orca_dH = [],[]
     # for molecule in results_orca:
     #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
@@ -499,22 +528,49 @@ if __name__ == "__main__":
 
     # orca_df = pd.DataFrame({"SMILES":orca_names, "dH_orca":orca_dH})
 
-    dH_df= pd.merge(xtb_df, amines, on="smiles")
+    #dH_df= pd.merge(xtb_df, amines, on="smiles")
 
-    print(dH_df)
+    #print(dH_df)
     #dH_df.to_csv("xtb2_alpb_opt_dH.csv")
     
     #exp_dH = [ v[2] for v in ] 
+    
+    #GA output code
+    output_file = "ga_outputs_10gens.txt"
+    with open(output_file, "w") as f:
+        for tp in res:
+            try:
+                s = tp[0]
+            except:
+                break
+            f.write(f"gen:{tp[0]},n_mols:{len(tp[1])}\n")
+            f.write(f"smiles,dH,logk,score\n")
+            for ml in tp[1]:
+                try:
+                    f.write(f"{Chem.MolToSmiles(ml.mol)},{ml.dHabs[1]:.2f},{ml.kabs:0.2f},{ml.score:0.2f}\n")
+                except:
+                    continue
+    print(f"Results: {res}")
+    for r in res[-1][1]:
+        print("r_mol:", r)
+        print(f"Mol: {Chem.MolToSmiles(r.mol)}, dH: {r.dHabs[1]:.2f}, log(k): {r.kabs:0.2f}, score:{r.score:0.2f}")
+    generations =[r[0] for r in res]
+    best_scores = [max([ind.score for ind in r[1]]) for r in res]
+    
 
-    #generations = [r[0] for r in results]
-    #best_scores = [max([ind.dH for ind in res[1]]) for res in results]
     #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
 
     # GraphGA.plot_dH_vs_dH(dH_df_orca_xtb["dH_xtb"], dH_df_orca_xtb["dH_orca"], ga.comp_options[-1], figname="xtb_vs_orca.eps", title="gfn_2(alpb) vs r2SCAN-3c(CPCM)", xlab="xtb", ylab="orca")
     #k2_df.to_csv("k_exp_vs_k_calc.csv")
 
     #GraphGA.plot_dH_vs_dH(k2_df["k_exp"], k2_df["k_calc"], ga.comp_options[-1], title="K2 benchmark", figname="k2vsk2gbsa.png", xlab="k2 exp", ylab="k2 calc")
+    
 
-    # fig, ax = plt.subplots()
-    # ax.plot(generations, best_scores)
-    # ax.set_xlabel("Generation")
+
+
+    print(f"generations: {generations}, best_scores:{best_scores}")
+    fig, ax = plt.subplots()
+    ax.plot(generations, best_scores)
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Max Score")
+    plt.savefig("10gen_amines.png")

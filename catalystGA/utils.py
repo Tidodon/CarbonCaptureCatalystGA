@@ -14,7 +14,7 @@ class MoleculeOptions:
     individual_type: BaseCatalyst
     min_size: int = 1
     max_size: int = 30
-    num_rotatable_bonds: Optional[int] = 5
+    num_rotatable_bonds: Optional[int] = 15
 
     def check(self, mol):
         if not mol:

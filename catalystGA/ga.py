@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import submitit
 import tomli
-
+from rdkit import Chem ############DELETE after
 from catalystGA.utils import GADatabase, MoleculeOptions, str_table
 from rdkit.Chem import RDConfig
 import sys
@@ -96,12 +96,12 @@ class GA(ABC):
 
             print(individual.score)
             return individual
-        options_string = ""
+        #options_string = ""
         #ops = population[0].list_of_options[0]
         #for key, value in ops.items():
         #    options_string += str(key) + "_" + str(value) + "_"
 
-        scoring_temp_dir = options_string + self.config["slurm"]["tmp_dir"] + "_" + str(uuid.uuid4())
+        scoring_temp_dir = self.config["slurm"]["tmp_dir"] + "_" + str(uuid.uuid4())
         executor = submitit.AutoExecutor(
             folder=scoring_temp_dir,
         )
@@ -136,11 +136,6 @@ class GA(ABC):
                 print(f"Finally raised in calcualte scores: {error}")
             new_population.append(cat)
         population = new_population
-
-        #for pop in population:
-        #    print("BIGpopop")
-        #    print("dG_lst inside ga.py", pop.dG_lst)
-        #    print("kabs inside ga.py: ", pop.kabs)
 
         self.sort_population(population, self.maximize_score) 
 
@@ -181,14 +176,24 @@ class GA(ABC):
         Returns:
             list: List of new individuals (children)
         """
+        #population = population
         children = []
         fitness = [ind.fitness for ind in population]
+        print(f"fitness: {fitness}, sum:{sum(fitness)}")
         ind_idx = 0
+       
         while len(children) < self.population_size:
-            parent1, parent2 = np.random.choice(population, p=fitness, size=2, replace=False)
-            child = self.crossover(parent1, parent2)
+
+            child = None
+            while child is None:
+                parent1, parent2 = np.random.choice(population, p=fitness, size=2, replace=False)
+                child = self.crossover(parent1, parent2)
+            print(f"After crossover child:{Chem.MolToSmiles(child.mol)}")#, parent1:{Chem.MolToSmiles(parent1)}, parent2:{Chem.MolToSmiles(parent2)}")
+
             if child and self.mol_options.check(child.mol):
+            
                 child.parents = str((parent1.idx, parent2.idx))
+
                 if random.random() <= self.mutation_rate:
                     child = self.mutate(child)
                     if child:
@@ -214,7 +219,13 @@ class GA(ABC):
         Returns:
             list: List of kept individuals
         """
-        tmp = list(set(population))
+        #tmp = list(set(population))
+        ###### Other no duplicates method
+        tmp =[]
+        for ob in population:
+            if ob not in tmp:
+                tmp.append(ob)
+        ######
         self.sort_population(tmp, self.maximize_score)
 
         return tmp[: self.population_size]
