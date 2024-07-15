@@ -169,19 +169,15 @@ class AmineCatalyst:
          
         #### Alternatively could be chosen based on the highest k value.
         self.dHabs = max(dHs, key=lambda x :x[1])
-         
+        self.dHabs[1] = AmineCatalyst.hartree_to_kjmol(self.dHabs[1])        
         print(f"self.dHabs: {self.dHabs}") 
         #AmineCatalyst.hartree_to_kjmol(
         #results_list = [[reactant_energy], [ ]for prod in prods]
-
-        # print("Reactant energy: ", self.weight_energy(reactant_confs))
 
         ### Decide on which product to use by k value:
         
 
         print(f"dHs: {dHs}")
-        #print(f"dGs: {self.dG_lst}")
-        #print(f"dG mol smile: {Chem.MolToSmiles(self.dG_lst[0][0])}") 
         #Assign score values based on dH, k, SA
         slope_k,  intercept_k  = 0.08896083453589532, 0.7866132724304302 #Data from alpb->r2scan opt runs
         slope_dH, intercept_dH = 0.4348138758572645,  53.47577527659122  #Data from 32 amines with alpb/gfn2 opt runs
@@ -199,13 +195,10 @@ class AmineCatalyst:
             ring_penalty  = len(max(ri, key=len))/6
         sa_score = sascorer.calculateScore(self.mol)
 
-        #dH scorings alone.
         print(f"Score components: \nk_score     :{k_score}\ndH_score    :{dH_score}\nring_penalty:{ring_penalty}\n sa_score    :{sa_score}")
-        self.score = k_score*dH_score - ring_penalty - sa_score 
-        #### Later a reordering code will be added here.
+        self.score = 5*k_score*dH_score - ring_penalty - sa_score 
         self.dHabs[1] = adjusted_dH 
         self.kabs = adjusted_kabs
-        #order_amine_products(dH, dG) -> top three most reactive. 
         ####
         #logP = Descriptors.MolLogP(self.mol)
         #self.score = logP
@@ -436,7 +429,7 @@ if __name__ == "__main__":
                   #
     ga = GraphGA(
         mol_options=MoleculeOptions(AmineCatalyst),
-        population_size=15,
+        population_size=10,
         n_generations=10,
         mutation_rate=0.5,
         db_location="organic.sqlite",
@@ -449,94 +442,9 @@ if __name__ == "__main__":
     res = ga.run()
 
     
-    ##########################################################
-    ###Temporary code for benchmarking k2 computations.#######
-    ##########################################################
-
-    calc_names, calc_k =  [],[]
-    calc_names_tert, calc_k_tert = [], []
-    #print(f"results Kabs, {results}, {results[0]}, {results[0].kabs}")
-    #print("COMPUTED MOLS:", len(results))
-    #for res in results:
-    #    print("actual kabs: ",Chem.MolToSmiles(res.mol), res.kabs)
-
-    #for molecule in results:
-    #    print(f"Score example: {molecule.score}")
-    #    if molecule.score == math.nan:
-    #        continue
-    #    print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-    #    #if molecule.dG_lst == False:
-    #    #    continue
-    #    #if True:#molecule.dG_lst[-1] in ["prim", "seco"]:
-    #    calc_names.append(Chem.MolToSmiles(molecule.mol))
-    #    calc_k.append(molecule.kabs)#$AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1])
-    #    #elif molecule.dG_lst[-1] == "tert":
-    #    #    calc_names_tert.append(Chem.MolToSmiles(molecule.mol))
-    #    #    calc_k_tert.append(molecule.kabs)
-
-    ####  #MAKE PLOTS for prim/seco AND tert CASES
-
-    ##########################################################
-    
-    
-    ##########################################################
-    ################Plotting preparation.####################
-    ##########################################################
-
- 
-    #exp_k = amines.loc[amines['SMILES'].isin(calc_names)]['k2'].tolist()
-    #exp_names = amines.loc[amines['SMILES'].isin(calc_names)]['SMILES'].tolist()
-    
-    #exp_k = amines.loc[amines['smiles'].isin(calc_names)]['logK7'].tolist()
-    #exp_names = amines.loc[amines['smiles'].isin(calc_names)]['smiles'].tolist()
-
-    #exp_k_2 = amines.loc[amines['smiles'].isin(calc_names)]['logk7'].tolist()
-    #exp_names = amines.loc[amines['smiles'].isin(calc_names)]['smiles'].tolist()
-
-    #exp_df = amines[['SMILES','k2' ]]
-    #calc_df = pd.DataFrame({"SMILES":calc_names, "k_calc":calc_k})
-    #exp_df = amines[['smiles','logK7' ]]
-    #exp_df2 = amines[['smiles','logk7' ]]
-    #calc_df = pd.DataFrame({"smiles":calc_names, "k_calc":calc_k})
-    #print(f"calc_names: {calc_df}")
-    #k_df = pd.merge(calc_df, exp_df, on="smiles")
-    #k2_df = pd.merge(k_df, exp_df2, on="smiles")
-    #print(f"merged: {k2_df}")
-    #k2_df.to_csv("xxxxk_prim_seco_gbsa_r2scan_opt.csv")
-
-
-    #calc_df_tert = pd.DataFrame({"smiles":calc_names_tert, "k_calc":calc_k_tert})
-    #print(calc_df_tert)
-    #k2_df_tert = pd.merge(calc_df_tert, exp_df, on="smiles")
-    #k2_df_tert.to_csv("logK7_tert_gbsa.csv")
-
-    #print("outputs: ", k2_df, "logK7")
-    #print("outputs tert: ", k2_df_tert, "logK7-tert")
-
-    #xtb_names, xtb_dH = [],[]
-    #for molecule in results:
-    #    #print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-    #    xtb_names.append(Chem.MolToSmiles(molecule.mol))
-    #    xtb_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
-        
-    #xtb_df = pd.DataFrame({"smiles":xtb_names, "dH_xtb":xtb_dH})
-    # orca_names, orca_dH = [],[]
-    # for molecule in results_orca:
-    #     print("molecuel: ", Chem.MolToSmiles(molecule.mol))
-    #     orca_names.append(Chem.MolToSmiles(molecule.mol))
-    #     orca_dH.append(AmineCatalyst.hartree_to_kjmol(molecule.dHabs[1]))
-
-    # orca_df = pd.DataFrame({"SMILES":orca_names, "dH_orca":orca_dH})
-
-    #dH_df= pd.merge(xtb_df, amines, on="smiles")
-
-    #print(dH_df)
-    #dH_df.to_csv("xtb2_alpb_opt_dH.csv")
-    
-    #exp_dH = [ v[2] for v in ] 
     
     #GA output code
-    output_file = "ga_outputs_10gens.txt"
+    output_file = "ga_10_gen_outputs_003.txt"
     with open(output_file, "w") as f:
         for tp in res:
             try:
@@ -547,30 +455,20 @@ if __name__ == "__main__":
             f.write(f"smiles,dH,logk,score\n")
             for ml in tp[1]:
                 try:
-                    f.write(f"{Chem.MolToSmiles(ml.mol)},{ml.dHabs[1]:.2f},{ml.kabs:0.2f},{ml.score:0.2f}\n")
+                    f.write(f"{Chem.MolToSmiles(ml.mol)},{ml.dHabs[1]:.3f},{ml.kabs:0.3f},{ml.score:0.3f}\n")
                 except:
                     continue
     print(f"Results: {res}")
     for r in res[-1][1]:
         print("r_mol:", r)
-        print(f"Mol: {Chem.MolToSmiles(r.mol)}, dH: {r.dHabs[1]:.2f}, log(k): {r.kabs:0.2f}, score:{r.score:0.2f}")
+        print(f"Mol: {Chem.MolToSmiles(r.mol)}, dH: {r.dHabs[1]:.3f}, log(k): {r.kabs:0.3f}, score:{r.score:0.3f}")
     generations =[r[0] for r in res]
     best_scores = [max([ind.score for ind in r[1]]) for r in res]
     
-
-    #calc_dH = [max([ind.dH for ind in res[1]]) for res in results]
-
-    # GraphGA.plot_dH_vs_dH(dH_df_orca_xtb["dH_xtb"], dH_df_orca_xtb["dH_orca"], ga.comp_options[-1], figname="xtb_vs_orca.eps", title="gfn_2(alpb) vs r2SCAN-3c(CPCM)", xlab="xtb", ylab="orca")
-    #k2_df.to_csv("k_exp_vs_k_calc.csv")
-
-    #GraphGA.plot_dH_vs_dH(k2_df["k_exp"], k2_df["k_calc"], ga.comp_options[-1], title="K2 benchmark", figname="k2vsk2gbsa.png", xlab="k2 exp", ylab="k2 calc")
-    
-
-
 
     print(f"generations: {generations}, best_scores:{best_scores}")
     fig, ax = plt.subplots()
     ax.plot(generations, best_scores)
     ax.set_xlabel("Generation")
     ax.set_ylabel("Max Score")
-    plt.savefig("10gen_amines.png")
+    plt.savefig("xXXXx_ga_10_gen_amines_003.png")

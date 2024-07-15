@@ -97,6 +97,7 @@ def ConstrainedEmbedMultipleConfsMultipleFrags(
         print("NO MATCH?")
     if not match:
         raise ValueError("molecule doesn't match the core")
+        
     sio = sys.stderr = StringIO()
     if not AllChem.UFFHasAllMoleculeParams(mol):
         raise Exception(Chem.MolToSmiles(mol), sio.getvalue())
@@ -130,7 +131,7 @@ def ConstrainedEmbedMultipleConfsMultipleFrags(
     cids = list(cids)
     print("past exceptionsi", " cids:", cids)
     if len(cids) == 0:
-        print(coordMap, Chem.MolToSmiles(mol_bonded), "Could not embedf mol:", Chem.MolToSmile(mol))
+        print(coordMap, Chem.MolToSmiles(mol_bonded), "Could not embedf mol:", Chem.MolToSmiles(mol))
         raise ValueError("Could not embed molecule.")
 
     algMap = [(j, i) for i, j in enumerate(match)]

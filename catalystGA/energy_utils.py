@@ -227,7 +227,7 @@ class energy_utils:
             print("orca options: ", orca_options)
             #### Prepare orca output to same format as xtb output:
             try:
-                res = [orca_calculate(atoms=atoms, coords=conformer, options=orca_options, n_cores=self.n_cores, charge=charge, xtra_inp_str=detailed_options) for conformer in conformers]
+                res = [orca_calculate(atoms=atoms, coords=conformer, options=orca_options,  n_cores=self.n_cores, charge=charge, xtra_inp_str=detailed_options) for conformer in conformers]
                 if 'opt_coords' in res[0]:
                     return [[v['atoms'], v['opt_coords'], v['electronic_energy']] for v in res]
                 else:
@@ -309,7 +309,6 @@ class energy_utils:
         precomputed_atoms = []
 
         for prod in products:
-            print("Check products ",Chem.MolToSmiles(prod))
             prod_smile = Chem.MolToSmiles(prod)
             
             if self.prod_results:

@@ -47,12 +47,12 @@ def compute_dH_data(smile, list_of_options, database_path):
     return results
 
 
-def compute_dH_list(smile, reactant_energy, product_energies, miscs_energies):
+def compute_dH_list(smile: str, reactant_energy: dict, product_energies: dict, miscs_energies:dict) -> list:
     
     """
     Generates dHs values given dictionaries holding reactant, product and misc molecules information.
     """
-    print(reactant_energy[smile][0], miscs_energies["[H]O[H]"][0], miscs_energies["O=C=O"][0], miscs_energies["[H]OC(=O)[O-]"][0], [product[1] for product in product_energies.items() ])
+    print("SMILE in compute_dH_list", smile, " ", reactant_energy[smile][0], miscs_energies["[H]O[H]"][0], miscs_energies["O=C=O"][0], miscs_energies["[H]OC(=O)[O-]"][0], [product[1] for product in product_energies.items() ])
     reactants = reactant_energy[smile][0] + miscs_energies["[H]O[H]"][0] + miscs_energies["O=C=O"][0]
 
     products_possibilites = [(name, miscs_energies["[H]OC(=O)[O-]"][0] + product[0]) for name, product in product_energies.items()]
