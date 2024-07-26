@@ -2,6 +2,12 @@
 #-treat tert
 import math
 import random
+import numpy as np 
+from scipy import stats 
+#import time
+import pandas as pd 
+import matplotlib.pyplot as plt 
+
 
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -307,21 +313,10 @@ class GraphGA(GA):
             self.append_results(results, gennum=n, detailed=True)
              
             print(f"population in gen: {n} is {self.population}")
-            #for pop in self.population:
-            #    if isinstance(pop, tuple):
-            #        del pop
-            #    else:
-            #        print(f"mol:{Chem.MolToSmiles(pop.mol)}, fitness:{pop.fitness}, score:{pop.score}")
 
             children = self.reproduce(self.population, n + 1)
-            #with open("produced_children_mols", "a") as f:
-            #    for m in children:
-            #        f.write(Chem.MolToSmiles(m.mol))
-            #        f.write("\n")
                            
             children = self.add_comp_db_attributes(children) #####Appends comp methods and db
-            #for pop in children:
-            #    pop.calculate_score()
 
             children = self.calculate_scores(children, gen_id=n + 1)
             self.db.add_individuals(n + 1, children)
@@ -330,7 +325,6 @@ class GraphGA(GA):
         self.calculate_fitness(self.population)
         self.db.add_generation(n + 1, self.population)
         self.append_results(results, gennum=n + 1, detailed=True)
-        print("FINISHEDi GA") 
         return results
 
     @staticmethod
@@ -383,12 +377,6 @@ class GraphGA(GA):
         plt.close()
 
 if __name__ == "__main__": 
-    import numpy as np 
-    from scipy import stats 
-    #import time
-    import pandas as pd 
-    import matplotlib.pyplot as plt 
-
     ##Get paths to amines and database.
     database_path = ""
     amines_csv_path  = ""
@@ -412,13 +400,8 @@ if __name__ == "__main__":
     amines_csv_path = amines_csv_path[:-10] + "conw_prepped.csv"
     amines = pd.read_csv(amines_csv_path)
 
-    print(f"amines pre canonicalize: {amines}")
     amines['smiles'] = amines['smiles'].apply(canonicalize)
-    print(f"amines post canonicalize: {amines}")
-    calc_dH, exp_dH = [], []
 
-    cnt = 0
-    names, dHs = [],[]
 
     list_of_options = [{"program":"xtb","method":"gfn_2", "opt":True,  "solvation":"alpb", "solvent":"water"}]#,
     #{"program":"orca","method":"r2SCAN-3c", "solvation":"CPCM", "solvent":"water"}]#,
@@ -444,7 +427,7 @@ if __name__ == "__main__":
     
     
     #GA output code
-    output_file = "ga_10_gen_outputs_003.txt"
+    output_file = "ga_10_gen_outputs_007.txt"
     with open(output_file, "w") as f:
         for tp in res:
             try:
@@ -471,4 +454,4 @@ if __name__ == "__main__":
     ax.plot(generations, best_scores)
     ax.set_xlabel("Generation")
     ax.set_ylabel("Max Score")
-    plt.savefig("xXXXx_ga_10_gen_amines_003.png")
+    plt.savefig("xXXXx_ga_30_gen_amines_006.png")

@@ -1,0 +1,247 @@
+#terdt SELECT smiles, energy, opt_coords FROM miscs WHERE smiles='O=C=O' AND method='r2SCAN-3c' AND solvation='CPCM'
+amines pre canonicalize:               smiles       k2    dH    pKa
+0          CC1CNCCN1  44.0000  72.0   9.57
+1        OCCN1CCCCC1   0.0036  58.2   9.52
+2           CN(C)CCO   0.0500  63.0   9.23
+3       OCCN(CCO)CCO   0.0100  61.0   7.76
+4         CN(CCO)CCO   0.0190  60.5   8.52
+5           C1CNCCN1  61.8500  80.0   9.71
+6               NCCO   5.5500  85.5   9.44
+7               NCCN  22.5000  84.0   9.92
+8            CC(N)CO   1.0000  85.0   9.47
+9         CC(C)(N)CO   0.9000  80.0   9.72
+10             CNCCO   5.0000  74.0   9.85
+11            CCNCCO  11.2500  73.5   9.89
+12     CC(C)C(C)(N)O   0.6050  68.0      -
+13      CC(C)(C)NCCO   0.1900  80.0  10.72
+14        CCN(CC)CCO   0.1400  73.0   9.75
+15           CC(C)CN   1.1000  97.0  10.41
+16         CN(C)CCCO   0.8500  55.0   9.54
+17         CN(C)CCCN  14.5000  91.0   9.91
+18           NCCOCCO   5.2500  71.0   9.46
+19           NCCNCCO  12.0000  79.0      -
+20       CC(O)CN(C)C   0.0455  61.0    9.5
+21          CCC(N)CO   5.0000  82.0      -
+22          CCCCNCCO   2.0000  74.0     10
+23      NC(CO)(CO)CO   1.4100  56.0   8.95
+24          NCCCCCCN  42.0000  98.0  11.85
+25          C1COCCN1  14.3500  82.0   8.49
+26         CN1CCNCC1   4.0000  67.0   9.14
+27        OCC1CCNCC1  21.0000  71.0   9.09
+28          C1CCNCC1  42.0000  81.0  11.22
+29       NCCN1CCNCC1  31.0000  72.0      -
+30           OCCNCCO   2.0000  72.0   8.96
+31  CCCCCCCCCCCCNCCO   8.0000  50.0      -
+32             CCCCN   1.0000  95.0   10.8
+amines post canonicalize:               smiles       k2    dH    pKa
+0          CC1CNCCN1  44.0000  72.0   9.57
+1        OCCN1CCCCC1   0.0036  58.2   9.52
+2           CN(C)CCO   0.0500  63.0   9.23
+3       OCCN(CCO)CCO   0.0100  61.0   7.76
+4         CN(CCO)CCO   0.0190  60.5   8.52
+5           C1CNCCN1  61.8500  80.0   9.71
+6               NCCO   5.5500  85.5   9.44
+7               NCCN  22.5000  84.0   9.92
+8            CC(N)CO   1.0000  85.0   9.47
+9         CC(C)(N)CO   0.9000  80.0   9.72
+10             CNCCO   5.0000  74.0   9.85
+11            CCNCCO  11.2500  73.5   9.89
+12     CC(C)C(C)(N)O   0.6050  68.0      -
+13      CC(C)(C)NCCO   0.1900  80.0  10.72
+14        CCN(CC)CCO   0.1400  73.0   9.75
+15           CC(C)CN   1.1000  97.0  10.41
+16         CN(C)CCCO   0.8500  55.0   9.54
+17         CN(C)CCCN  14.5000  91.0   9.91
+18           NCCOCCO   5.2500  71.0   9.46
+19           NCCNCCO  12.0000  79.0      -
+20       CC(O)CN(C)C   0.0455  61.0    9.5
+21          CCC(N)CO   5.0000  82.0      -
+22          CCCCNCCO   2.0000  74.0     10
+23      NC(CO)(CO)CO   1.4100  56.0   8.95
+24          NCCCCCCN  42.0000  98.0  11.85
+25          C1COCCN1  14.3500  82.0   8.49
+26         CN1CCNCC1   4.0000  67.0   9.14
+27        OCC1CCNCC1  21.0000  71.0   9.09
+28          C1CCNCC1  42.0000  81.0  11.22
+29       NCCN1CCNCC1  31.0000  72.0      -
+30           OCCNCCO   2.0000  72.0   8.96
+31  CCCCCCCCCCCCNCCO   8.0000  50.0      -
+32             CCCCN   1.0000  95.0   10.8
+=========================================================================================
+                                      GA Parameters                                      
+Parameter                                                                  Value         
+-----------------------------------------------------------------------------------------
+Population Size                                                            3             
+Number of Generations                                                      2             
+Mutation Rate                                                              0.5000        
+Selection Pressure                                                         1.5000        
+
+-----------------------------------------------------------------------------------------
+                                     Molecule Options                                    
+Parameter                                                                  Value         
+-----------------------------------------------------------------------------------------
+Minimum Size                                                               1             
+Minimum Size                                                               30            
+
+=========================================================================================
+
+
+Population in run:  [<__main__.AmineCatalyst object at 0x7f49c6633f10>, <__main__.AmineCatalyst object at 0x7f49c664ba10>, <__main__.AmineCatalyst object at 0x7f49c664bd50>]
+Exception raised in calcualte scores: Exception: Job 45331440_0 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_620eb1d9-b022-4a1f-8706-6c5b89952b9c/45331440_0_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331440_0 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_620eb1d9-b022-4a1f-8706-6c5b89952b9c/45331440_0_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Exception raised in calcualte scores: Exception: Job 45331440_1 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_620eb1d9-b022-4a1f-8706-6c5b89952b9c/45331440_1_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331440_1 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_620eb1d9-b022-4a1f-8706-6c5b89952b9c/45331440_1_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Exception raised in calcualte scores: Exception: Job 45331440_2 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_620eb1d9-b022-4a1f-8706-6c5b89952b9c/45331440_2_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331440_2 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_620eb1d9-b022-4a1f-8706-6c5b89952b9c/45331440_2_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Size of pop: 3
+=========================================================================================
+                                       Generation 0                                      
+SMILES                                                                     Score         
+-----------------------------------------------------------------------------------------
+CC1CNCCN1                                                                  nan           
+OCCN1CCCCC1                                                                nan           
+CN(C)CCO                                                                   nan           
+=========================================================================================
+
+N-generation:  0 
+
+Exception raised in calcualte scores: Exception: Job 45331447_0 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_64025144-6956-459f-b119-f58c741013ce/45331447_0_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331447_0 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_64025144-6956-459f-b119-f58c741013ce/45331447_0_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Exception raised in calcualte scores: Exception: Job 45331447_1 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_64025144-6956-459f-b119-f58c741013ce/45331447_1_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331447_1 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_64025144-6956-459f-b119-f58c741013ce/45331447_1_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Exception raised in calcualte scores: Exception: Job 45331447_2 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_64025144-6956-459f-b119-f58c741013ce/45331447_2_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331447_2 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_64025144-6956-459f-b119-f58c741013ce/45331447_2_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+=========================================================================================
+                                       Generation 1                                      
+SMILES                                                                     Score         
+-----------------------------------------------------------------------------------------
+OCCN1CCCCC1                                                                nan           
+OCCN1CC=NCC1                                                               nan           
+CC1CNCCN1                                                                  nan           
+=========================================================================================
+
+N-generation:  1 
+
+Exception raised in calcualte scores: Exception: Job 45331453_0 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_54b79e3f-5e53-4e3b-8505-d92137b87244/45331453_0_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331453_0 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_54b79e3f-5e53-4e3b-8505-d92137b87244/45331453_0_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Exception raised in calcualte scores: Exception: Job 45331453_1 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_54b79e3f-5e53-4e3b-8505-d92137b87244/45331453_1_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331453_1 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_54b79e3f-5e53-4e3b-8505-d92137b87244/45331453_1_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Exception raised in calcualte scores: Exception: Job 45331453_2 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_54b79e3f-5e53-4e3b-8505-d92137b87244/45331453_2_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+Finally raised in calcualte scores: Exception: Job 45331453_2 (task: 0) with path /lustre/hpc/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/_scoring_54b79e3f-5e53-4e3b-8505-d92137b87244/45331453_2_0_result.pkl
+has not produced any output (state: FAILED)
+Error stream produced:
+----------------------------------------
+srun: fatal: SLURM_MEM_PER_CPU, SLURM_MEM_PER_GPU, and SLURM_MEM_PER_NODE are mutually exclusive.
+
+{job.stderr()}
+=========================================================================================
+                                       Generation 2                                      
+SMILES                                                                     Score         
+-----------------------------------------------------------------------------------------
+CC=CCC=N                                                                   nan           
+OCCN1CCCCC1                                                                nan           
+OCCN1CC=NCC1                                                               nan           
+=========================================================================================
+

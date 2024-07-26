@@ -233,7 +233,7 @@ def crossover_non_ring(parent_A: Chem.Mol, parent_B: Chem.Mol) -> Chem.Mol or No
     return None
 
 
-@hide_warnings
+#@hide_warnings
 def graph_crossover(parent_A: Chem.Mol, parent_B: Chem.Mol) -> Chem.Mol or None:
     """Performs crossover between two molecules, either via ring system or non-
     ring system.

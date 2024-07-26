@@ -249,8 +249,8 @@ if __name__ == "__main__":
    print(atoms)
    atoms_ord = csv_string_to_atoms_ord(atoms)
    print("atoms_ord:", atoms_ord)
-   empty_dbs(database_path, "reactants", "products", method="gfn_2", solvation="alpb")#)solvation="CPCM")#method="CAM-B3LYP def2-TZVP")
-   print_table_contents(database_path, "miscs", "reactants", "products", print_data=True, method="gfn_2", solvation="alpb")#, solvation="CPCM")
+   #empty_dbs(database_path, "reactants", "products", method="gfn_2", solvation="alpb")#)solvation="CPCM")#method="CAM-B3LYP def2-TZVP")
+   print_table_contents(database_path, "miscs", "reactants", "products", print_data=True, method="r2SCAN-3c")#, solvation="CPCM")
 
 
    

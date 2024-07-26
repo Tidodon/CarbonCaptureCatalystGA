@@ -61,7 +61,7 @@ def orca_calculate(
             )
         )
     with open("/groups/kemi/orlowski/CarbonCapture/CarbonCaptureCatalystGA/header_test/"+"input.inp", "w") as f:
-        f.write(write_orca_input(
+         f.write(write_orca_input(
                 atoms,
                 coords,
                 charge,
@@ -96,6 +96,7 @@ def orca_calculate(
         results = {}
     if output_dir:
         results["calc_dir"] = dir_name
+    print(f"results: {results}")
     return results
 
 
@@ -147,8 +148,6 @@ def write_orca_input(
     inputstr += "*\n"
     inputstr += "\n"  # magic line
     print("ORCA INPUT STR: ", inputstr)
-    with open("ZZZZ__orca_input.txt", "w") as f:
-        f.write(inputstr)
     return inputstr
 
 
